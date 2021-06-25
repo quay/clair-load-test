@@ -16,7 +16,7 @@ import (
 var ReportsCmd = &cli.Command{
 	Name:        "report",
 	Description: "request reports for named containers",
-	Usage:       "clairctl report",
+	Usage:       "clair-load-test report",
 	Action:      reportAction,
 	Flags: []cli.Flag{
 		&cli.StringFlag{

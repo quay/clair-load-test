@@ -47,6 +47,7 @@ func main() {
 		},
 		Commands: []*cli.Command{
 			ReportsCmd,
+			FlushDBCmd,
 		},
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
