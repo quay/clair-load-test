@@ -1,6 +1,6 @@
 # Clair Load Testing
 
-This project provides a simple CLI for making requests to Clair. Although it doesn't boast the same HTTP control that a load testing tool such as [wrk](https://github.com/wg/wrk), it does offer a way to construct API calls to Clair that all container layers to be fetched without the need for Quay. This tool is build on top of [clairctl](https://github.com/quay/clair/blob/cbdc9caab450489377ab1d6bb19429d54df639cc/Documentation/reference/clairctl.md) and requires it in your path.
+This project provides a simple CLI for making requests to Clair. Although it doesn't boast the same HTTP control as a load testing tool such as [wrk](https://github.com/wg/wrk), it does offer a way to construct API calls to Clair that all container layers to be fetched without the need for Quay. This tool is build on top of [clairctl](https://github.com/quay/clair/blob/cbdc9caab450489377ab1d6bb19429d54df639cc/Documentation/reference/clairctl.md) and requires it in your path.
 
 > **NOTE**: `clair-load-test` is **NOT** for use on production instances of Clair, it does some not so nice things to the database.
 
@@ -39,6 +39,12 @@ GLOBAL OPTIONS:
 ```
 
 > **NOTE**: The config schema is the same as for a running instance of Clair, this allows the tool to authenticate to execute both HTTP requests and Database operations.
+
+## Installation
+
+```
+make build
+```
 
 ## Examples
 
