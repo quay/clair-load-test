@@ -30,7 +30,7 @@ func main() {
 	defer cancel()
 
 	app := &cli.App{
-		Name:                 "clairstress",
+		Name:                 "clair-load-test",
 		Version:              "0.0.1",
 		Usage:                "",
 		Description:          "A command-line tool for stress testing clair v4.",
