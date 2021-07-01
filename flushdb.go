@@ -14,21 +14,38 @@ var FlushDBCmd = &cli.Command{
 	Description: "truncate relevant tables in the DB",
 	Usage:       "clair-load-test flushdb",
 	Action:      flushDBAction,
-	Flags:       []cli.Flag{},
+	Flags: []cli.Flag{
+		&cli.BoolFlag{
+			Name:    "override",
+			Aliases: []string{"y"},
+			Usage:   "do not ask to confirm",
+			Value:   false,
+			EnvVars: []string{"_OVERRIDE"},
+		},
+	},
 }
 
 func flushDBAction(c *cli.Context) error {
 	ctx := c.Context
+	conf, err := loadConfig(confFilePath)
+	if err != nil {
+		return err
+	}
+
 	//connect to DB
-	DBURL := "postgres://clair:clair@localhost:5432/clair"
-	conn, err := pgx.Connect(ctx, DBURL)
+	conn, err := pgx.Connect(ctx, conf.Indexer.ConnString)
+	if err != nil {
+		return err
+	}
 
-	zlog.Warn(ctx).Msg("About to delete data, continue? [y/n]")
-	reader := bufio.NewReader(os.Stdin)
-	input, _ := reader.ReadString('\n')
+	if !c.Bool("override") {
+		zlog.Warn(ctx).Msg("About to delete data, continue? [y/n]")
+		reader := bufio.NewReader(os.Stdin)
+		input, _ := reader.ReadString('\n')
 
-	if string([]byte(input)[0]) != "y" {
-		return nil
+		if string([]byte(input)[0]) != "y" {
+			return nil
+		}
 	}
 
 	zlog.Info(ctx).Msg("Going to TRUNCATE table scanned_layer")

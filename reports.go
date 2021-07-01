@@ -40,11 +40,20 @@ var ReportsCmd = &cli.Command{
 	},
 }
 
+type clairCtlArgs struct {
+	host           string
+	configFilePath string
+}
+
 func reportAction(c *cli.Context) error {
 	ctx := c.Context
 	containers := c.String("containers")
-	host := c.String("host")
 	concurrency := c.Int64("concurrency")
+
+	conf := &clairCtlArgs{
+		host:           c.String("host"),
+		configFilePath: confFilePath,
+	}
 
 	sem := semaphore.NewWeighted(concurrency)
 	g, ctx := errgroup.WithContext(ctx)
@@ -57,7 +66,7 @@ func reportAction(c *cli.Context) error {
 			}
 			defer sem.Release(1)
 
-			res, err := reportForContainer(ctx, cc, host)
+			res, err := reportForContainer(ctx, cc, conf)
 			if err != nil {
 				return err
 			}
@@ -68,11 +77,17 @@ func reportAction(c *cli.Context) error {
 	return g.Wait()
 }
 
-func reportForContainer(ctx context.Context, container, host string) (string, error) {
-	cmd := exec.Command("clairctl", "report", "--host", host, container)
+func reportForContainer(ctx context.Context, container string, conf *clairCtlArgs) (string, error) {
+	cmd := exec.Command(
+		"clairctl", "--config", conf.configFilePath, "report",
+		"--host", conf.host, container)
 	zlog.Debug(ctx).Str("container", cmd.String()).Msg("Starting to pull report")
-	var out bytes.Buffer
+	var out, errOut bytes.Buffer
 	cmd.Stdout = &out
+	cmd.Stderr = &errOut
 	err := cmd.Run()
-	return out.String(), err
+	if err != nil {
+		return errOut.String(), err
+	}
+	return out.String(), nil
 }

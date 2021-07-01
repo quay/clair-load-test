@@ -20,7 +20,8 @@ var (
 		Timestamp().
 		Logger()
 
-	commonClaim = jwt.Claims{}
+	commonClaim  = jwt.Claims{}
+	confFilePath = "config.yaml"
 )
 
 func main() {
@@ -43,11 +44,15 @@ func main() {
 			}
 			zlog.Set(&logout)
 			commonClaim.Issuer = c.String("issuer")
+			if c.IsSet("config") {
+				confFilePath = c.Path("config")
+			}
 			return nil
 		},
 		Commands: []*cli.Command{
 			ReportsCmd,
 			FlushDBCmd,
+			CreateTokenCmd,
 		},
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
