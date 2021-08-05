@@ -68,7 +68,8 @@ func reportAction(c *cli.Context) error {
 
 			res, err := reportForContainer(ctx, cc, conf)
 			if err != nil {
-				return err
+				zlog.Error(ctx).Str("err", res).Str("container", cc).Msg(err.Error())
+				return nil
 			}
 			zlog.Debug(ctx).Str("container", cc).Msg(res)
 			return nil

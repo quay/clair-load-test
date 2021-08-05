@@ -37,6 +37,7 @@ func flushDBAction(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
+	defer conn.Close(ctx)
 
 	if !c.Bool("override") {
 		zlog.Warn(ctx).Msg("About to delete data, continue? [y/n]")
