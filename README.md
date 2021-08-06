@@ -57,3 +57,14 @@ clair-load-test -D report --containers ubuntu:xenial,alpine:3.14.0,busybox:uclib
 ```
 clair-load-test -D -c ./loadtest-local.yaml flushdb
 ```
+
+## Containerized Running
+
+In the interests of making the tool portable and dependency free (well almost). It is possible to run in a container.
+
+### Build and run the container
+
+```sh
+podman build . -t clair-load-test
+podman run -e CONCURRENCY=10 -e HOST=http://clair-indexer-perftestx-clair.apps.quaydev-rosa-1.czz9.p1.openshiftapps.com -e CLAIR_CONF=/config/loadtest-dist.yaml -e LOADTESTENTRY=short -it 
+```
