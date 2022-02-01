@@ -66,6 +66,6 @@ In the interests of making the tool portable and dependency free (well almost). 
 
 ```sh
 podman build . -t clair-load-test
-podman run -e CONCURRENCY=10 -e HOST=http://clair-indexer-perftestx-clair.apps.quaydev-rosa-1.czz9.p1.openshiftapps.com -e CLAIR_CONF=/config/loadtest-dist.yaml -e LOADTESTENTRY=short -it clair-load-test
+podman run -v config:/config -e CONCURRENCY=10 -e HOST=http://clair-indexer-perftestx-clair.apps.quaydev-rosa-1.czz9.p1.openshiftapps.com -e CLAIR_CONF=/config/loadtest-dist.yaml -e LOADTESTENTRY=short -it clair-load-test
 ```
 
