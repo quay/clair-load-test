@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/sync/semaphore"
 
 	"github.com/quay/zlog"
 	"github.com/urfave/cli/v2"
@@ -60,6 +59,12 @@ var ReportsCmd = &cli.Command{
 			Value:   time.Minute * 1,
 			EnvVars: []string{"TIMEOUT"},
 		},
+		&cli.Float64Flag{
+			Name:    "rate",
+			Usage:   "--rate 1",
+			Value:   1,
+			EnvVars: []string{"RATE"},
+		},
 	},
 }
 
@@ -87,34 +92,26 @@ func reportAction(c *cli.Context) error {
 	ctx := c.Context
 	containersArg := c.String("containers")
 	containers := strings.Split(containersArg, ",")
-	concurrency := c.Int("concurrency")
 	psk := c.String("psk")
 	host := c.String("host")
 	delete := c.Bool("delete")
 	timeout := c.Duration("timeout")
-
-	if concurrency > len(containers) {
-		return fmt.Errorf("concurrency cannot exceed the number of containers to process.")
-	}
+	perSecond := c.Float64("rate")
 
 	reporter := NewReporter(host, psk)
 
-	sem := semaphore.NewWeighted(int64(concurrency))
 	g, ctx := errgroup.WithContext(ctx)
 	i := 0
-	t := time.NewTimer(timeout)
+	timer := time.NewTimer(timeout)
+	ticker := time.NewTicker(time.Duration(1000/perSecond) * time.Millisecond)
+loop:
 	for {
 		select {
-		case <-t.C:
-			goto finish
-		default:
+		case <-timer.C:
+			break loop
+		case <-ticker.C:
 			cc := containers[i]
-			if err := sem.Acquire(ctx, 1); err != nil {
-				return err
-			}
 			g.Go(func() error {
-				defer sem.Release(1)
-
 				err := reporter.reportForContainer(ctx, cc, delete)
 				if err != nil {
 					zlog.Error(ctx).Str("container", cc).Msg(err.Error())
@@ -129,7 +126,6 @@ func reportAction(c *cli.Context) error {
 			}
 		}
 	}
-finish:
 	err := g.Wait()
 	if err != nil {
 		return err
@@ -199,17 +195,17 @@ func (r *reporter) createIndexReport(ctx context.Context, body []byte, token str
 	// Start clock
 	t := time.Now()
 	resp, err := r.cl.Do(req)
-	if err != nil {
-		return "", err
-	}
 	diff := time.Now().Sub(t)
 	r.stats.IncrTotalIndexReportRequestLatencyMilliseconds(diff.Milliseconds())
 	r.stats.IncrTotalIndexReportRequests(int64(1))
+	if err != nil {
+		return "", err
+	}
 	// end clock and report
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusCreated {
 		r.stats.IncrNon2XXIndexReportResponses(int64(1))
-		return "", fmt.Errorf("non 201 response from indexer %d, body: %s", resp.StatusCode)
+		return "", fmt.Errorf("non 201 response from indexer %d", resp.StatusCode)
 	}
 	// decode response
 	var irr = &IndexReportReponse{}
@@ -236,14 +232,14 @@ func (r *reporter) getVulnerabilityReport(ctx context.Context, hash string, toke
 	// Start clock
 	t := time.Now()
 	resp, err := r.cl.Do(req)
+	diff := time.Now().Sub(t)
+	r.stats.IncrTotalVulnerabilityReportRequestLatencyMilliseconds(diff.Milliseconds())
+	r.stats.IncrTotalVulnerabilityReportRequests(int64(1))
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 	// end clock and report
-	diff := time.Now().Sub(t)
-	r.stats.IncrTotalVulnerabilityReportRequestLatencyMilliseconds(diff.Milliseconds())
-	r.stats.IncrTotalVulnerabilityReportRequests(int64(1))
 	if resp.StatusCode != http.StatusOK {
 		r.stats.IncrNon2XXVulnerabilityReportResponses(int64(1))
 		return fmt.Errorf("non 200 response from matcher %d", resp.StatusCode)
