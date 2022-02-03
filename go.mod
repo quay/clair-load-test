@@ -3,7 +3,9 @@ module github.com/crozzy/clair-load-test
 go 1.16
 
 require (
-	github.com/jackc/pgx/v4 v4.11.0
+	github.com/bsipos/thist v1.0.0
+	github.com/jackc/pgx/v4 v4.11.0 // indirect
+	github.com/prometheus/client_golang v1.12.1
 	github.com/quay/clair/v4 v4.1.1
 	github.com/quay/zlog v0.0.0-20210113185248-ce16eed1dcec
 	github.com/rs/zerolog v1.23.0

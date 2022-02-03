@@ -29,9 +29,18 @@ func createTokenAction(c *cli.Context) error {
 	ctx := c.Context
 	key := c.String("key")
 	zlog.Debug(ctx).Str("key", key).Msg("got md5 key")
-	decKey, err := base64.StdEncoding.DecodeString(key)
+	tok, err := createToken(key)
 	if err != nil {
 		return err
+	}
+	zlog.Info(ctx).Msg(tok)
+	return nil
+}
+
+func createToken(key string) (string, error) {
+	decKey, err := base64.StdEncoding.DecodeString(key)
+	if err != nil {
+		return "", err
 	}
 	sk := jose.SigningKey{
 		Algorithm: jose.HS256,
@@ -39,20 +48,16 @@ func createTokenAction(c *cli.Context) error {
 	}
 	s, err := jose.NewSigner(sk, nil)
 	if err != nil {
-		return err
+		return "", err
 	}
 	now := time.Now()
 
 	// Mint the jwt.
-	tok, err := jwt.Signed(s).Claims(&jwt.Claims{
+	return jwt.Signed(s).Claims(&jwt.Claims{
 		Issuer:    "clairctl",
-		Expiry:    jwt.NewNumericDate(now.Add(time.Minute)),
+		Expiry:    jwt.NewNumericDate(now.Add(time.Minute * 10)),
 		IssuedAt:  jwt.NewNumericDate(now),
 		NotBefore: jwt.NewNumericDate(now),
 	}).CompactSerialize()
-	if err != nil {
-		return err
-	}
-	zlog.Info(ctx).Msg(tok)
-	return nil
+
 }
