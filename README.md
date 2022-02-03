@@ -1,8 +1,8 @@
 # Clair Load Testing
 
-This project provides a simple CLI for making requests to Clair. Although it doesn't boast the same HTTP control as a load testing tool such as [wrk](https://github.com/wg/wrk), it does offer a way to construct API calls to Clair that all container layers to be fetched without the need for Quay. This tool is build on top of [clairctl](https://github.com/quay/clair/blob/cbdc9caab450489377ab1d6bb19429d54df639cc/Documentation/reference/clairctl.md) and requires it in your path.
+This project provides a simple CLI for making requests to Clair. Although it doesn't boast the same HTTP control as a load testing tool such as [wrk](https://github.com/wg/wrk), it does offer a way to construct API calls to Clair that all container layers to be fetched without the need for Quay. This tool uses [clairctl](https://github.com/quay/clair/blob/cbdc9caab450489377ab1d6bb19429d54df639cc/Documentation/reference/clairctl.md) to create manifest definitions and requires it in your path.
 
-> **NOTE**: `clair-load-test` is **NOT** for use on production instances of Clair, it does some not so nice things to the database.
+> **NOTE**: `clair-load-test` is **NOT** for use on production instances of Clair.
 
 ## Prerequisites
 
@@ -12,7 +12,7 @@ This project provides a simple CLI for making requests to Clair. Although it doe
 ## Usage
 ```
 NAME:
-   clair-load-test - Stress your Clair
+   clair-load-test - A new cli application
 
 USAGE:
    clair-load-test [global options] command [command options] [arguments...]
@@ -25,20 +25,37 @@ DESCRIPTION:
 
 COMMANDS:
    report       clair-load-test report
-   flushdb      clair-load-test flushdb
    createtoken  createtoken --key sdfvevefr==
    help, h      Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
-   -D                        print debugging logs (default: false)
-   -q                        quieter log output (default: false)
-   --config value, -c value  clair configuration file (default: "config.yaml") [$CLAIR_CONF]
-   --help, -h                show help (default: false)
-   --version, -v             print the version (default: false)
+   -D             print debugging logs (default: false)
+   -q             quieter log output (default: false)
+   --help, -h     show help (default: false)
+   --version, -v  print the version (default: false)
 
 ```
 
-> **NOTE**: The config schema is the same as for a running instance of Clair, this allows the tool to authenticate to execute both HTTP requests and Database operations.
+### Report
+```
+NAME:
+   clair-load-test report - clair-load-test report
+
+USAGE:
+   clair-load-test report [command options] [arguments...]
+
+DESCRIPTION:
+   request reports for named containers
+
+OPTIONS:
+   --host value         --host localhost:6060/ (default: "http://localhost:6060/") [$CLAIR_API]
+   --containers value   --containers ubuntu:latest,mysql:latest [$CONTAINERS]
+   --psk value          --psk secretkey [$PSK]
+   --delete             --delete (default: false) [$DELETE]
+   --timeout value      --timeout 1m (default: 1m0s) [$TIMEOUT]
+   --rate value         --rate 1 (default: 1) [$RATE]
+   --help, -h           show help (default: false)
+```
 
 ## Installation
 
@@ -48,14 +65,9 @@ make build
 
 ## Examples
 
-### Index and retrieve the Vulnerability Report for some images from a local Clair instance, 5 at a time:
+### Index and retrieve the Vulnerability Report for some images from a local Clair instance, at a rate of 1 per second and delete the Index Report after:
 ```sh
-clair-load-test -D report --containers ubuntu:xenial,alpine:3.14.0,busybox:uclibc,postgres:9.6.22,redis:buster,python:slim,node:latest,mysql:8.0.25,mongo:5.0.0-rc3,nginx:mainline --concurrency=5 --host="http://localhost:6060"
-```
-
-### Flush Database tables to ensure reindexing on resubmission:
-```
-clair-load-test -D -c ./loadtest-local.yaml flushdb
+clair-load-test -D report --containers ubuntu:xenial,alpine:3.14.0,busybox:uclibc,postgres:9.6.22,redis:buster,python:slim,node:latest,mysql:8.0.25,mongo:5.0.0-rc3,nginx:mainline --rate=1 --host="http://localhost:6060" --psk=secret --timeout=2m --delete=1
 ```
 
 ## Containerized Running
@@ -66,6 +78,6 @@ In the interests of making the tool portable and dependency free (well almost). 
 
 ```sh
 podman build . -t clair-load-test
-podman run -v config:/config -e CONCURRENCY=10 -e HOST=http://clair-indexer-perftestx-clair.apps.quaydev-rosa-1.czz9.p1.openshiftapps.com -e CLAIR_CONF=/config/loadtest-dist.yaml -e LOADTESTENTRY=short -it clair-load-test
+podman run -e HOST=http://clair-indexer-perftestx-clair.apps.quaydev-rosa-1.czz9.p1.openshiftapps.com -e TIMEOUT=1m -e DELETE=1 -e PSK=secret -e RATE=1 -it clair-load-test
 ```
 
