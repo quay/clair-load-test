@@ -35,12 +35,6 @@ var ReportsCmd = &cli.Command{
 			Value:   "",
 			EnvVars: []string{"CONTAINERS"},
 		},
-		&cli.IntFlag{
-			Name:    "concurrency",
-			Usage:   "--concurrency 10",
-			Value:   1,
-			EnvVars: []string{"CONCURRENCY"},
-		},
 		&cli.StringFlag{
 			Name:    "psk",
 			Usage:   "--psk secretkey",
