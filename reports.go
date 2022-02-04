@@ -189,13 +189,13 @@ func (r *reporter) createIndexReport(ctx context.Context, body []byte, token str
 	// Start clock
 	t := time.Now()
 	resp, err := r.cl.Do(req)
+	// end clock and report
 	diff := time.Now().Sub(t)
 	r.stats.IncrTotalIndexReportRequestLatencyMilliseconds(diff.Milliseconds())
 	r.stats.IncrTotalIndexReportRequests(int64(1))
 	if err != nil {
 		return "", err
 	}
-	// end clock and report
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusCreated {
 		r.stats.IncrNon2XXIndexReportResponses(int64(1))
@@ -226,6 +226,7 @@ func (r *reporter) getVulnerabilityReport(ctx context.Context, hash string, toke
 	// Start clock
 	t := time.Now()
 	resp, err := r.cl.Do(req)
+	// end clock and report
 	diff := time.Now().Sub(t)
 	r.stats.IncrTotalVulnerabilityReportRequestLatencyMilliseconds(diff.Milliseconds())
 	r.stats.IncrTotalVulnerabilityReportRequests(int64(1))
@@ -233,7 +234,6 @@ func (r *reporter) getVulnerabilityReport(ctx context.Context, hash string, toke
 		return err
 	}
 	defer resp.Body.Close()
-	// end clock and report
 	if resp.StatusCode != http.StatusOK {
 		r.stats.IncrNon2XXVulnerabilityReportResponses(int64(1))
 		return fmt.Errorf("non 200 response from matcher %d", resp.StatusCode)
@@ -252,14 +252,11 @@ func (r *reporter) deleteIndexReports(ctx context.Context, hash string, token st
 	}
 	req.Header.Add("Authorization", "Bearer "+token)
 
-	// Start clock
 	zlog.Debug(ctx).Str("hash", hash).Msg("deleting index report")
 	resp, err := r.cl.Do(req)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-	// end clock and report
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusNoContent {
 		return fmt.Errorf("non 204 response from indexer while deleting %d", resp.StatusCode)
