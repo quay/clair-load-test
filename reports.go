@@ -66,6 +66,27 @@ type IndexReportReponse struct {
 	Hash string `json:"manifest_hash"`
 }
 
+type testConfig struct {
+	Containers []string      `json:"containers"`
+	PSK        string        `json:"-"`
+	Host       string        `json:"host"`
+	Delete     bool          `json:"delete"`
+	Timeout    time.Duration `json:"timeout"`
+	PerSecond  float64       `json:"rate"`
+}
+
+func NewConfig(c *cli.Context) *testConfig {
+	containersArg := c.String("containers")
+	return &testConfig{
+		Containers: strings.Split(containersArg, ","),
+		PSK:        c.String("psk"),
+		Host:       c.String("host"),
+		Delete:     c.Bool("delete"),
+		Timeout:    c.Duration("timeout"),
+		PerSecond:  c.Float64("rate"),
+	}
+}
+
 type reporter struct {
 	host  string
 	psk   string
@@ -84,29 +105,23 @@ func NewReporter(host, psk string) *reporter {
 
 func reportAction(c *cli.Context) error {
 	ctx := c.Context
-	containersArg := c.String("containers")
-	containers := strings.Split(containersArg, ",")
-	psk := c.String("psk")
-	host := c.String("host")
-	delete := c.Bool("delete")
-	timeout := c.Duration("timeout")
-	perSecond := c.Float64("rate")
+	conf := NewConfig(c)
 
-	reporter := NewReporter(host, psk)
+	reporter := NewReporter(conf.Host, conf.PSK)
 
 	g, ctx := errgroup.WithContext(ctx)
 	i := 0
-	timer := time.NewTimer(timeout)
-	ticker := time.NewTicker(time.Duration(1000/perSecond) * time.Millisecond)
+	timer := time.NewTimer(conf.Timeout)
+	ticker := time.NewTicker(time.Duration(1000/conf.PerSecond) * time.Millisecond)
 loop:
 	for {
 		select {
 		case <-timer.C:
 			break loop
 		case <-ticker.C:
-			cc := containers[i]
+			cc := conf.Containers[i]
 			g.Go(func() error {
-				err := reporter.reportForContainer(ctx, cc, delete)
+				err := reporter.reportForContainer(ctx, cc, conf.Delete)
 				if err != nil {
 					zlog.Error(ctx).Str("container", cc).Msg(err.Error())
 					return nil
@@ -115,7 +130,7 @@ loop:
 				return nil
 			})
 			i++
-			if i+1 > len(containers) {
+			if i+1 > len(conf.Containers) {
 				i = 0
 			}
 		}
@@ -128,11 +143,11 @@ loop:
 	stats := reporter.stats.GetStats()
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
-	err = enc.Encode(stats)
+	err = enc.Encode(conf)
 	if err != nil {
 		return err
 	}
-	return nil
+	return enc.Encode(stats)
 }
 
 func (r *reporter) reportForContainer(ctx context.Context, container string, delete bool) error {
