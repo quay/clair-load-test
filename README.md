@@ -12,7 +12,7 @@ This project provides a simple CLI for making requests to Clair. Although it doe
 ## Usage
 ```
 NAME:
-   clair-load-test - A new cli application
+   clair-load-test - A command-line tool for stress testing clair v4.
 
 USAGE:
    clair-load-test [global options] command [command options] [arguments...]

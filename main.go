@@ -31,7 +31,7 @@ func main() {
 	app := &cli.App{
 		Name:                 "clair-load-test",
 		Version:              "0.0.1",
-		Usage:                "",
+		Usage:                "A command-line tool for stress testing clair v4.",
 		Description:          "A command-line tool for stress testing clair v4.",
 		EnableBashCompletion: true,
 		Before: func(c *cli.Context) error {

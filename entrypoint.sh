@@ -27,10 +27,10 @@ HOST=${HOST:-"http://localhost:6060"}
 DELETE=${DELETE:0}
 
 display_usage() {
-    echo "Usage: ${0} <shell|short|prolonged|flushdb|help>"
+    echo "Usage: ${0} <shell|run|help>"
     echo
     echo "The first argument needs to be one of the above modes"
-    echo "if no argument is supplied the default is \"short\"."
+    echo "if no argument is supplied the default is \"run\"."
     echo "\"help\" displays this message"
 }
 
