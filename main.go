@@ -24,7 +24,6 @@ var (
 )
 
 func main() {
-	var exit int
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -61,9 +60,8 @@ func main() {
 		},
 		ExitErrHandler: func(c *cli.Context, err error) {
 			if err != nil {
-				exit = 1
 				if err, ok := err.(cli.ExitCoder); ok {
-					exit = err.ExitCode()
+					err.ExitCode()
 				}
 				logout.Error().Err(err).Send()
 			}

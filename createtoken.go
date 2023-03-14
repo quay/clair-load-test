@@ -55,7 +55,7 @@ func createToken(key string) (string, error) {
 	// Mint the jwt.
 	return jwt.Signed(s).Claims(&jwt.Claims{
 		Issuer:    "clairctl",
-		Expiry:    jwt.NewNumericDate(now.Add(time.Minute * 10)),
+		Expiry:    jwt.NewNumericDate(now.Add(time.Minute * 360)),
 		IssuedAt:  jwt.NewNumericDate(now),
 		NotBefore: jwt.NewNumericDate(now),
 	}).CompactSerialize()
