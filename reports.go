@@ -195,41 +195,21 @@ func (r *reporter) createIndexReport(ctx context.Context, body []byte, token str
 	)
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	req.Header.Set("Content-Type", "application/json")
-
-	fmt.Println("Request in body bytes")
-	fmt.Println(req.Body)
 	bodyBytes, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		// handle error
 	}
 	req.Body.Close()
-	fmt.Println("After read io")
-	fmt.Println(bodyBytes)
 
-	requestData := RequestData{
-		Method:  req.Method,
-		URL:     req.URL.String(),
-		Headers:  req.Header,
-		Body:    bodyBytes,
-	}
-	
-	file, err := os.Create("requests.json")
-	if err != nil {
-		// handle error
-	}
-	defer file.Close()
-	
-	encoder := json.NewEncoder(file)
-	err = encoder.Encode(requestData)
-	if err != nil {
-		// handle error
-	}
-	
-	cmd := exec.Command("vegeta", "attack", "-targets", "requests.json")
-	err = cmd.Run()
-	if err != nil {
-		// handle error
-	}
+	var vegetaData []map[string]interface{}
+	vegetaData = append(vegetaData, map[string]interface{}{
+		"method":  req.Method,
+		"url":     req.URL.String(),
+		"header": req.Header,
+		"body":    bodyBytes,
+	})
+
+	run_vegeta(vegetaData)
 	return "", nil
 }
 
@@ -283,21 +263,17 @@ func (r *reporter) deleteIndexReports(ctx context.Context, hash string, token st
 func run_vegeta(requestDicts []map[string]interface{}) {
 
 	// Convert requestDicts to a slice of Vegeta requests
-	var requests []string
+	var requests string = ""
 	for _, reqDict := range requestDicts {
 		req := make(map[string]interface{})
 		req["url"] = reqDict["url"]
 		req["method"] = reqDict["method"]
 
 		// Encode the body as base64-encoded JSON if the request method is not GET
-		if body, ok := reqDict["body"].(interface{}).(*bytes.Buffer); ok && reqDict["method"] != "GET" {
-			// jsonData, err := json.Marshal(body)
-			// if err != nil {
-			// 	fmt.Fprintf(os.Stderr, "Error converting body into base64 json: %v\n", err)
-			// 	os.Exit(1)
-			// }
-			req["body"] = base64.StdEncoding.EncodeToString(body.Bytes())
-			// req["body"] = body
+		if reqDict["body"] != nil && reqDict["method"] != "GET" {
+			if body, ok := reqDict["body"].([]byte); ok {
+				req["body"] = base64.StdEncoding.EncodeToString(body)
+			}
 		}
 
 		// Set the request headers
@@ -309,59 +285,73 @@ func run_vegeta(requestDicts []map[string]interface{}) {
 				"Content-Type":  {"application/json"},
 			}
 		}
-		fmt.Println(req)
 		reqString, err := json.Marshal(req)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error encoding request: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Println("After json marshal")
-		fmt.Println(reqString)
-		requests = append(requests, string(reqString))
+		requests += string(reqString) + "\n"
 	}
 
-	// Write the Vegeta requests to a temporary file
-	reqFile, err := ioutil.TempFile("", "vegeta-requests-")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating temporary file for requests: %v\n", err)
-		os.Exit(1)
-	}
-	//defer os.Remove(reqFile.Name())
-	_, err = reqFile.WriteString(strings.Join(requests, "\n"))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error writing requests to temporary file: %v\n", err)
-		os.Exit(1)
+	if strings.TrimSpace(requests) == "" {
+		panic("Something is wrong with requests. Requests string cannot be empty")
 	}
 
-	// Run the Vegeta attack and capture the output
-	vegetaCmd := exec.Command(
-		"vegeta",
-		"attack",
-		"-lazy",
-		"-format=json",
-		"-rate", "50",
+	// Ensure a directory exists for writing vegeta results
+	log_directory := "./logs"
+	if _, err := os.Stat(log_directory); os.IsNotExist(err) {
+		os.MkdirAll(log_directory, 0755)
+	}
+
+	// Run `vegeta attack` to execute the HTTP Requests
+	cmd := exec.Command("vegeta", "attack", "-lazy", "-format=json", "-rate", "100", "-insecure")
+	cmd.Stdin = strings.NewReader(requests)
+	output, err := cmd.Output()
+	if err != nil {
+		panic(err)
+	}
+
+	// Show Vegeta Stats
+	cmd = exec.Command("vegeta", "report")
+	cmd.Stdin = strings.NewReader(string(output))
+	cmd.Stdout = os.Stdout
+	err = cmd.Run()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Vegeta attack completed successfully")
+
+	// Write Vegeta Stats to a file
+	result_filename := fmt.Sprintf("%s/%s_%s_result.json", log_directory, "TEST_UUID", "test_name")
+	cmd = exec.Command("vegeta", "report", "--every=1s", "--type=json", fmt.Sprintf("--output=%s", result_filename))
+	cmd.Stdin = strings.NewReader(string(output))
+	err = cmd.Run()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("Results for test %s written to file: %s\n", "test_name", result_filename)
+
+	// Use Snafu to push results to Elasticsearch
+	fmt.Printf("Recording test results in ElasticSearch: %s\n", "https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com")
+	cmd = exec.Command("run_snafu",
+		"-t", "vegeta",
+		"-u", "TEST_UUID",
+		"-w", fmt.Sprintf("%d", 100),
+		"-r", result_filename,
+		"--target_name", "test_name",
 	)
-	output, err := vegetaCmd.Output()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error running Vegeta attack: %v\n", err)
-		os.Exit(1)
+	cmd.Env = []string{
+		fmt.Sprintf("es=%s", "https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com"),
+		fmt.Sprintf("es_port=%s", "443"),
+		fmt.Sprintf("es_index=%s", "cliar-test-index"),
+		fmt.Sprintf("clustername=%s", "example-registry-clair-app-quay-enterprise.apps.vchalla-quay-test.perfscale.devcluster.openshift.com"),
 	}
-
-	// Show Vegeta stats
-	reportCmd := exec.Command("vegeta", "report")
-	reportCmd.Stdin = strings.NewReader(string(output))
-	reportOutput, err := reportCmd.Output()
+	output, err = cmd.Output()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error running Vegeta report: %v\n", err)
-		os.Exit(1)
+		panic(err)
 	}
-	fmt.Println(string(reportOutput))
-
-	// Write Vegeta stats to a file
-	resultFile, err := ioutil.TempFile("", "vegeta-results-")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating temporary file for results: %v\n", err)
-		os.Exit(1)
+	fmt.Printf("%s\n", output)
+	if cmd.ProcessState.ExitCode() != 0 {
+		panic("command failed")
 	}
-	fmt.Println(resultFile)
 }
