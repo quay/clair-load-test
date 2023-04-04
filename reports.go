@@ -1,22 +1,19 @@
 package main
 
 import (
+	//"bufio"
 	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
-
 	"golang.org/x/sync/errgroup"
-
 	"github.com/quay/zlog"
-	// "github.com/tsenart/vegeta/lib"
 	"github.com/urfave/cli/v2"
 )
 
@@ -65,10 +62,6 @@ var ReportsCmd = &cli.Command{
 	},
 }
 
-type IndexReportReponse struct {
-	Hash string `json:"manifest_hash"`
-}
-
 type testConfig struct {
 	Containers []string      `json:"containers"`
 	PSK        string        `json:"-"`
@@ -76,6 +69,10 @@ type testConfig struct {
 	Delete     bool          `json:"delete"`
 	Timeout    time.Duration `json:"timeout"`
 	PerSecond  float64       `json:"rate"`
+}
+
+type Blob struct {
+    Hash string `json:"hash"`
 }
 
 func NewConfig(c *cli.Context) *testConfig {
@@ -179,88 +176,68 @@ func getManifest(ctx context.Context, container string) ([]byte, error) {
 	return cmd.Output()
 }
 
-type RequestData struct {
-    Method  string 		`json:"method"`
-    URL     string		`json:"url"`
-    Headers http.Header	`json:"header"`
-    Body    []byte		`json:"body"`
-}
-
 func (r *reporter) createIndexReport(ctx context.Context, body []byte, token string) (string, error) {
     url := r.host + "/indexer/api/v1/index_report"
-	req, err := http.NewRequestWithContext(
-		ctx, http.MethodPost,
-		url,
-		bytes.NewBuffer(body),
-	)
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-	req.Header.Set("Content-Type", "application/json")
-	bodyBytes, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		// handle error
+	headers := map[string][]string{
+		"Content-Type": {"application/json"},
+		"Authorization": {fmt.Sprintf("Bearer %s", token)},
 	}
-	req.Body.Close()
-
+	var blob Blob
+	err := json.Unmarshal(body, &blob)
+	if err != nil {
+		fmt.Println("Handling error here")
+	}
+	hashToReturn := blob.Hash
 	var vegetaData []map[string]interface{}
 	vegetaData = append(vegetaData, map[string]interface{}{
-		"method":  req.Method,
-		"url":     req.URL.String(),
-		"header": req.Header,
-		"body":    bodyBytes,
+		"method":  "POST",
+		"url":     url,
+		"header": headers,
+		"body":    body,
 	})
 
-	run_vegeta(vegetaData)
-	return "", nil
+	run_vegeta(vegetaData,"post_index_report")
+	return hashToReturn, nil
 }
 
 func (r *reporter) getVulnerabilityReport(ctx context.Context, hash string, token string) error {
-	req, err := http.NewRequestWithContext(
-		ctx, http.MethodGet,
-		r.host+"/matcher/api/v1/vulnerability_report/"+hash,
-		nil,
-	)
-	if err != nil {
-		return err
+	url := r.host+"/matcher/api/v1/vulnerability_report/"+hash
+	headers := map[string][]string{
+		"Content-Type": {"application/json"},
+		"Authorization": {fmt.Sprintf("Bearer %s", token)},
 	}
+	zlog.Debug(ctx).Str("hash", hash).Msg("getting vulnerability report")
+	var vegetaData []map[string]interface{}
+	vegetaData = append(vegetaData, map[string]interface{}{
+		"method":  "GET",
+		"url":     url,
+		"header": headers,
+	})
 
-	req.Header.Add("Authorization", "Bearer "+token)
-	fmt.Printf("In getVulnerabilityReport Request:- %v\n", req)
-	// Start clock
-	t := time.Now()
-	resp, err := r.cl.Do(req)
-	// end clock and report
-	diff := time.Now().Sub(t)
-	fmt.Println(diff)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
+	run_vegeta(vegetaData, "get_vulnerability_report")
 	return nil
 }
 
 func (r *reporter) deleteIndexReports(ctx context.Context, hash string, token string) error {
-	req, err := http.NewRequestWithContext(
-		ctx, http.MethodDelete,
-		r.host+"/indexer/api/v1/index_report/"+hash,
-		nil,
-	)
-	if err != nil {
-		return err
+	url := r.host+"/indexer/api/v1/index_report/"+hash
+	headers := map[string][]string{
+		"Content-Type": {"application/json"},
+		"Authorization": {fmt.Sprintf("Bearer %s", token)},
 	}
-	req.Header.Add("Authorization", "Bearer "+token)
-
 	zlog.Debug(ctx).Str("hash", hash).Msg("deleting index report")
-	fmt.Printf("In deleteIndexReport Request:- %v\n", req)
-	resp, err := r.cl.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
+	var vegetaData []map[string]interface{}
+	vegetaData = append(vegetaData, map[string]interface{}{
+		"method":  "DELETE",
+		"url":     url,
+		"header": headers,
+	})
+
+	run_vegeta(vegetaData, "delete_vulnerability_report")
 	return nil
 }
 
 
-func run_vegeta(requestDicts []map[string]interface{}) {
+func run_vegeta(requestDicts []map[string]interface{}, testName string) {
 
 	// Convert requestDicts to a slice of Vegeta requests
 	var requests string = ""
@@ -322,14 +299,14 @@ func run_vegeta(requestDicts []map[string]interface{}) {
 	fmt.Println("Vegeta attack completed successfully")
 
 	// Write Vegeta Stats to a file
-	result_filename := fmt.Sprintf("%s/%s_%s_result.json", log_directory, "TEST_UUID", "test_name")
+	result_filename := fmt.Sprintf("%s/%s_%s_result.json", log_directory, "TEST_UUID", testName)
 	cmd = exec.Command("vegeta", "report", "--every=1s", "--type=json", fmt.Sprintf("--output=%s", result_filename))
 	cmd.Stdin = strings.NewReader(string(output))
 	err = cmd.Run()
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Results for test %s written to file: %s\n", "test_name", result_filename)
+	fmt.Printf("Results for test %s written to file: %s\n", testName, result_filename)
 
 	// Use Snafu to push results to Elasticsearch
 	fmt.Printf("Recording test results in ElasticSearch: %s\n", "https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com")
@@ -338,7 +315,7 @@ func run_vegeta(requestDicts []map[string]interface{}) {
 		"-u", "TEST_UUID",
 		"-w", fmt.Sprintf("%d", 100),
 		"-r", result_filename,
-		"--target_name", "test_name",
+		"--target_name", testName,
 	)
 	cmd.Env = []string{
 		fmt.Sprintf("es=%s", "https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com"),
@@ -346,12 +323,26 @@ func run_vegeta(requestDicts []map[string]interface{}) {
 		fmt.Sprintf("es_index=%s", "cliar-test-index"),
 		fmt.Sprintf("clustername=%s", "example-registry-clair-app-quay-enterprise.apps.vchalla-quay-test.perfscale.devcluster.openshift.com"),
 	}
-	output, err = cmd.Output()
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("%s\n", output)
-	if cmd.ProcessState.ExitCode() != 0 {
-		panic("command failed")
-	}
+	var stdout bytes.Buffer
+    var stderr bytes.Buffer
+    cmd.Stdout = &stdout
+    cmd.Stderr = &stderr
+    if err := cmd.Run(); err != nil {
+        panic(err)
+    }
+    fmt.Printf("stdout: %s", stdout.String())
+    fmt.Printf("stderr: %s", stderr.String())
+    // cmd.Stdout = &out
+    // if err := cmd.Run(); err != nil {
+    //     panic(err)
+    // }
+    // fmt.Printf("%s", out.String())
+	// output, err = cmd.Output()
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// fmt.Printf("%s\n", output)
+	// if cmd.ProcessState.ExitCode() != 0 {
+	// 	panic("command failed")
+	// }
 }
