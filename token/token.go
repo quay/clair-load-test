@@ -34,7 +34,7 @@ func createTokenAction(c *cli.Context) error {
 	ctx := c.Context
 	key := c.String("key")
 	zlog.Debug(ctx).Str("key", key).Msg("got md5 key")
-	tok, err := createToken(key)
+	tok, err := CreateToken(key)
 	if err != nil {
 		return err
 	}
@@ -42,7 +42,7 @@ func createTokenAction(c *cli.Context) error {
 	return nil
 }
 
-func createToken(key string) (tok string, err error) {
+func CreateToken(key string) (tok string, err error) {
 	decKey, err := getSigningKey(key)
 	if err != nil {
 		return "", err

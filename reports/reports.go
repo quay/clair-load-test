@@ -12,9 +12,12 @@ import (
 	"strings"
 	"golang.org/x/sync/errgroup"
 	"github.com/quay/zlog"
+	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v2"
 	"github.com/vishnuchalla/clair-load-test/token"
 )
+
+var logout zerolog.Logger
 
 var ReportsCmd = &cli.Command{
 	Name:        "report",
@@ -133,7 +136,7 @@ func (r *reporter) reportForContainer(ctx context.Context, container string, del
 	}
 	// Get a token
 	logout.Debug().Str("container", container).Msg("got manifest")
-	token, err := token.createToken(r.psk)
+	token, err := token.CreateToken(r.psk)
 	if err != nil {
 		zlog.Debug(ctx).Str("PSK", r.psk).Msg("creating token")
 		return fmt.Errorf("could not create token: %w", err)
