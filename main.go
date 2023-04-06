@@ -8,20 +8,34 @@ import (
 	"github.com/quay/zlog"
 	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v2"
-	"gopkg.in/square/go-jose.v2/jwt"
 )
 
-var (
-	logout = zerolog.New(&zerolog.ConsoleWriter{
+var logout zerolog.Logger
+
+// createLogger returns a new logger with the specified log level and time format.
+func createLogger(level zerolog.Level, timeFormat string) zerolog.Logger {
+	return zerolog.New(&zerolog.ConsoleWriter{
 		Out:        os.Stderr,
-		TimeFormat: time.RFC3339,
-	}).Level(zerolog.InfoLevel).
+		TimeFormat: timeFormat,
+	}).Level(level).
 		With().
 		Timestamp().
 		Logger()
+}
 
-	commonClaim = jwt.Claims{}
-)
+// setLogLevel sets the log level based on the value of the "-D" and "-W" flags.
+func setLogLevel(c *cli.Context) error {
+	level := zerolog.InfoLevel
+	if c.Bool("W") {
+		level = zerolog.WarnLevel
+	}
+	if c.Bool("D") {
+		level = zerolog.DebugLevel
+	}
+	logout = createLogger(level, time.RFC3339)
+	zlog.Set(&logout)
+	return nil
+}
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -33,17 +47,7 @@ func main() {
 		Usage:                "A command-line tool for stress testing clair v4.",
 		Description:          "A command-line tool for stress testing clair v4.",
 		EnableBashCompletion: true,
-		Before: func(c *cli.Context) error {
-			if c.IsSet("q") {
-				logout = logout.Level(zerolog.WarnLevel)
-			}
-			if c.IsSet("D") {
-				logout = logout.Level(zerolog.DebugLevel)
-			}
-			zlog.Set(&logout)
-			commonClaim.Issuer = c.String("issuer")
-			return nil
-		},
+		Before:               setLogLevel,
 		Commands: []*cli.Command{
 			ReportsCmd,
 			CreateTokenCmd,
@@ -54,7 +58,7 @@ func main() {
 				Usage: "print debugging logs",
 			},
 			&cli.BoolFlag{
-				Name:  "q",
+				Name:  "W",
 				Usage: "quieter log output",
 			},
 		},
@@ -68,5 +72,4 @@ func main() {
 		},
 	}
 	app.RunContext(ctx, os.Args)
-
 }

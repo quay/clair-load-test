@@ -1,7 +1,6 @@
 package main
 
 import (
-	//"bufio"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -11,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 	"golang.org/x/sync/errgroup"
 	"github.com/quay/zlog"
 	"github.com/urfave/cli/v2"
@@ -47,12 +45,6 @@ var ReportsCmd = &cli.Command{
 			Value:   false,
 			EnvVars: []string{"DELETE"},
 		},
-		&cli.DurationFlag{
-			Name:    "timeout",
-			Usage:   "--timeout 1m",
-			Value:   time.Minute * 1,
-			EnvVars: []string{"TIMEOUT"},
-		},
 		&cli.Float64Flag{
 			Name:    "rate",
 			Usage:   "--rate 1",
@@ -67,7 +59,6 @@ type testConfig struct {
 	PSK        string        `json:"-"`
 	Host       string        `json:"host"`
 	Delete     bool          `json:"delete"`
-	Timeout    time.Duration `json:"timeout"`
 	PerSecond  float64       `json:"rate"`
 }
 
@@ -82,7 +73,6 @@ func NewConfig(c *cli.Context) *testConfig {
 		PSK:        c.String("psk"),
 		Host:       c.String("host"),
 		Delete:     c.Bool("delete"),
-		Timeout:    c.Duration("timeout"),
 		PerSecond:  c.Float64("rate"),
 	}
 }
@@ -97,7 +87,6 @@ func NewReporter(host, psk string) *reporter {
 	return &reporter{
 		host:  host,
 		psk:   psk,
-		cl:    &http.Client{Timeout: time.Minute * 1},
 	}
 }
 
@@ -126,7 +115,6 @@ func reportAction(c *cli.Context) error {
 		return err
 	}
 
-	fmt.Println("%v", conf)
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	err = enc.Encode(conf)
