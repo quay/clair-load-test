@@ -29,7 +29,7 @@ var ReportsCmd = &cli.Command{
 			Name:    "host",
 			Usage:   "--host localhost:6060/",
 			Value:   "http://localhost:6060/",
-			EnvVars: []string{"CLAIR_API"},
+			EnvVars: []string{"CLAIR_HOST"},
 		},
 		&cli.StringFlag{
 			Name:    "containers",
@@ -324,17 +324,4 @@ func run_vegeta(requestDicts []map[string]interface{}, testName string) {
     }
     fmt.Printf("stdout: %s", stdout.String())
     fmt.Printf("stderr: %s", stderr.String())
-    // cmd.Stdout = &out
-    // if err := cmd.Run(); err != nil {
-    //     panic(err)
-    // }
-    // fmt.Printf("%s", out.String())
-	// output, err = cmd.Output()
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// fmt.Printf("%s\n", output)
-	// if cmd.ProcessState.ExitCode() != 0 {
-	// 	panic("command failed")
-	// }
 }
