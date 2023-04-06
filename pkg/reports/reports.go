@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -14,7 +13,7 @@ import (
 	"github.com/quay/zlog"
 	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v2"
-	"github.com/vishnuchalla/clair-load-test/token"
+	"github.com/vishnuchalla/clair-load-test/pkg/token"
 )
 
 var logout zerolog.Logger
@@ -84,7 +83,6 @@ func NewConfig(c *cli.Context) *testConfig {
 type reporter struct {
 	host  string
 	psk   string
-	cl    *http.Client
 }
 
 func NewReporter(host, psk string) *reporter {
@@ -269,7 +267,10 @@ func run_vegeta(requestDicts []map[string]interface{}, testName string) {
 	// Ensure a directory exists for writing vegeta results
 	log_directory := "./logs"
 	if _, err := os.Stat(log_directory); os.IsNotExist(err) {
-		os.MkdirAll(log_directory, 0755)
+		if err := os.MkdirAll(log_directory, 0755); err != nil {
+			// Handle the error here
+			panic(err)
+		}
 	}
 
 	// Run `vegeta attack` to execute the HTTP Requests

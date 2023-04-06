@@ -73,5 +73,7 @@ func main() {
 			}
 		},
 	}
-	app.RunContext(ctx, os.Args)
+	if err := app.RunContext(ctx, os.Args); err != nil {
+		logout.Error().Err(err).Send()
+	}
 }
