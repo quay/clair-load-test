@@ -12,7 +12,6 @@ GIT_COMMIT = $(shell git rev-parse HEAD)
 VERSION ?= 0.0.1
 SOURCES := $(shell find . -type f -name "*.go")
 BUILD_DATE = $(shell date '+%Y-%m-%d-%H:%M:%S')
-CLAIR_LOAD_TEST_VERSION= github.com/vishnuchalla/clair-load-test/pkg/version
 
 # Containers
 ENGINE ?= podman
@@ -41,7 +40,7 @@ build: $(BIN_PATH)
 $(BIN_PATH): $(SOURCES)
 	@echo -e "\033[2mBuilding $(BIN_PATH)\033[0m"
 	@echo "GOPATH=$(GOPATH)"
-	GOARCH=$(ARCH) CGO_ENABLED=$(CGO) go build -v -mod vendor -ldflags "-X $(CLAIR_LOAD_TEST_VERSION).GitCommit=$(GIT_COMMIT) -X $(CLAIR_LOAD_TEST_VERSION).BuildDate=$(BUILD_DATE) -X $(CLAIR_LOAD_TEST_VERSION).Version=$(VERSION)" -o $(BIN_PATH) ./cmd/clair-load-test
+	GOARCH=$(ARCH) CGO_ENABLED=$(CGO) go build -v -mod vendor -o $(BIN_PATH) ./cmd/clair-load-test
 
 lint:
 	golangci-lint run

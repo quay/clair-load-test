@@ -144,6 +144,13 @@ func (r *reporter) reportForContainer(ctx context.Context, container string, del
 	if err != nil {
 		return fmt.Errorf("could not create index report: %w", err)
 	}
+
+	// Request index report
+	err = r.getIndexReport(ctx, hash, token)
+	if err != nil {
+		return fmt.Errorf("could not get index report: %w", err)
+	}
+
 	// Get a token
 	// Request vuln report
 	err = r.getVulnerabilityReport(ctx, hash, token)
@@ -156,6 +163,12 @@ func (r *reporter) reportForContainer(ctx context.Context, container string, del
 		if err != nil {
 			return fmt.Errorf("could not delete index report: %w", err)
 		}
+	}
+
+	// Request indexer state
+	err = r.getIndexerState(ctx, token)
+	if err != nil {
+		return fmt.Errorf("could not get index report: %w", err)
 	}
 	return nil
 }
@@ -188,6 +201,42 @@ func (r *reporter) createIndexReport(ctx context.Context, body []byte, token str
 
 	run_vegeta(vegetaData,"post_index_report")
 	return hashToReturn, nil
+}
+
+func (r *reporter) getIndexReport(ctx context.Context, hash string, token string) error {
+	url := r.host+"/indexer/api/v1/index_report/"+hash
+	headers := map[string][]string{
+		"Content-Type": {"application/json"},
+		"Authorization": {fmt.Sprintf("Bearer %s", token)},
+	}
+	zlog.Debug(ctx).Str("hash", hash).Msg("getting index report")
+	var vegetaData []map[string]interface{}
+	vegetaData = append(vegetaData, map[string]interface{}{
+		"method":  "GET",
+		"url":     url,
+		"header": headers,
+	})
+
+	run_vegeta(vegetaData, "get_index_report")
+	return nil
+}
+
+func (r *reporter) getIndexerState(ctx context.Context, token string) error {
+	url := r.host+"/indexer/api/v1/index_state"
+	headers := map[string][]string{
+		"Content-Type": {"application/json"},
+		"Authorization": {fmt.Sprintf("Bearer %s", token)},
+	}
+	zlog.Debug(ctx).Msg("getting indexer state")
+	var vegetaData []map[string]interface{}
+	vegetaData = append(vegetaData, map[string]interface{}{
+		"method":  "GET",
+		"url":     url,
+		"header": headers,
+	})
+
+	run_vegeta(vegetaData, "get_indexer_state")
+	return nil
 }
 
 func (r *reporter) getVulnerabilityReport(ctx context.Context, hash string, token string) error {
