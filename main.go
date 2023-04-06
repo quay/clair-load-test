@@ -8,6 +8,8 @@ import (
 	"github.com/quay/zlog"
 	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v2"
+	"github.com/vishnuchalla/clair-load-test/token"
+	"github.com/vishnuchalla/clair-load-test/reports"
 )
 
 var logout zerolog.Logger
@@ -49,8 +51,8 @@ func main() {
 		EnableBashCompletion: true,
 		Before:               setLogLevel,
 		Commands: []*cli.Command{
-			ReportsCmd,
-			CreateTokenCmd,
+			reports.ReportsCmd,
+			token.CreateTokenCmd,
 		},
 		Flags: []cli.Flag{
 			&cli.BoolFlag{

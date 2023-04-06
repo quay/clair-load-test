@@ -1,4 +1,4 @@
-package main
+package token
 
 import (
 	"encoding/base64"
@@ -8,6 +8,11 @@ import (
 	"github.com/urfave/cli/v2"
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
+)
+
+const (
+	TokenIssuer          = "clairctl"
+	TokenValidityPeriod  = time.Hour * 24 * 7
 )
 
 var CreateTokenCmd = &cli.Command{
@@ -37,13 +42,13 @@ func createTokenAction(c *cli.Context) error {
 	return nil
 }
 
-func createToken(key string) (string, error) {
-	decKey, err := base64.StdEncoding.DecodeString(key)
+func createToken(key string) (tok string, err error) {
+	decKey, err := getSigningKey(key)
 	if err != nil {
 		return "", err
 	}
 	sk := jose.SigningKey{
-		Algorithm: jose.HS256,
+		Algorithm: getSigningAlgorithm(),
 		Key:       decKey,
 	}
 	s, err := jose.NewSigner(sk, nil)
@@ -54,10 +59,18 @@ func createToken(key string) (string, error) {
 
 	// Mint the jwt.
 	return jwt.Signed(s).Claims(&jwt.Claims{
-		Issuer:    "clairctl",
-		Expiry:    jwt.NewNumericDate(now.Add(time.Minute * 360)),
+		Issuer:    TokenIssuer,
+		Expiry:    jwt.NewNumericDate(now.Add(TokenValidityPeriod)),
 		IssuedAt:  jwt.NewNumericDate(now),
 		NotBefore: jwt.NewNumericDate(now),
 	}).CompactSerialize()
 
+}
+
+func getSigningAlgorithm() jose.SignatureAlgorithm {
+	return jose.HS256
+}
+
+func getSigningKey(key string) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(key)
 }

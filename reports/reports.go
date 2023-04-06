@@ -1,4 +1,4 @@
-package main
+package reports
 
 import (
 	"bytes"
@@ -13,6 +13,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"github.com/quay/zlog"
 	"github.com/urfave/cli/v2"
+	"github.com/vishnuchalla/clair-load-test/token"
 )
 
 var ReportsCmd = &cli.Command{
@@ -132,7 +133,7 @@ func (r *reporter) reportForContainer(ctx context.Context, container string, del
 	}
 	// Get a token
 	logout.Debug().Str("container", container).Msg("got manifest")
-	token, err := createToken(r.psk)
+	token, err := token.createToken(r.psk)
 	if err != nil {
 		zlog.Debug(ctx).Str("PSK", r.psk).Msg("creating token")
 		return fmt.Errorf("could not create token: %w", err)
