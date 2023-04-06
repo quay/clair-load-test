@@ -9,11 +9,11 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"golang.org/x/sync/errgroup"
 	"github.com/quay/zlog"
 	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v2"
 	"github.com/vishnuchalla/clair-load-test/pkg/token"
+	"github.com/vishnuchalla/clair-load-test/pkg/manifests"
 )
 
 var logout zerolog.Logger
@@ -28,105 +28,98 @@ var ReportsCmd = &cli.Command{
 			Name:    "host",
 			Usage:   "--host localhost:6060/",
 			Value:   "http://localhost:6060/",
-			EnvVars: []string{"CLAIR_HOST"},
+			EnvVars: []string{"CLAIR_TEST_HOST"},
 		},
 		&cli.StringFlag{
 			Name:    "containers",
 			Usage:   "--containers ubuntu:latest,mysql:latest",
 			Value:   "",
-			EnvVars: []string{"CONTAINERS"},
+			EnvVars: []string{"CLAIR_TEST_CONTAINERS"},
 		},
 		&cli.StringFlag{
 			Name:    "psk",
 			Usage:   "--psk secretkey",
 			Value:   "",
-			EnvVars: []string{"PSK"},
+			EnvVars: []string{"CLAIR_TEST_PSK"},
+		},
+		&cli.StringFlag{
+			Name:    "eshost",
+			Usage:   "--eshost eshosturl",
+			Value:   "",
+			EnvVars: []string{"CLAIR_TEST_ES_HOST"},
+		},
+		&cli.StringFlag{
+			Name:    "esport",
+			Usage:   "--esport esport",
+			Value:   "",
+			EnvVars: []string{"CLAIR_TEST_ES_PORT"},
+		},
+		&cli.StringFlag{
+			Name:    "esindex",
+			Usage:   "--esindex esindex",
+			Value:   "",
+			EnvVars: []string{"CLAIR_TEST_ES_INDEX"},
 		},
 		&cli.BoolFlag{
 			Name:    "delete",
 			Usage:   "--delete",
 			Value:   false,
-			EnvVars: []string{"DELETE"},
+			EnvVars: []string{"INDEX_REPORT_DELETE"},
 		},
 		&cli.Float64Flag{
-			Name:    "rate",
-			Usage:   "--rate 1",
-			Value:   1,
-			EnvVars: []string{"RATE"},
+			Name:    "hitsize",
+			Usage:   "--hitsize 100",
+			Value:   25,
+			EnvVars: []string{"CLAIR_TEST_HIT_SIZE"},
+		},
+		&cli.Float64Flag{
+			Name:    "concurrency",
+			Usage:   "--concurrency 50",
+			Value:   10,
+			EnvVars: []string{"CLAIR_TEST_CONCURRENCY"},
 		},
 	},
 }
 
-type testConfig struct {
-	Containers []string      `json:"containers"`
-	PSK        string        `json:"-"`
-	Host       string        `json:"host"`
-	Delete     bool          `json:"delete"`
-	PerSecond  float64       `json:"rate"`
-}
-
-type Blob struct {
-    Hash string `json:"hash"`
-}
-
-func NewConfig(c *cli.Context) *testConfig {
+func NewConfig(c *cli.Context) *TestConfig {
 	containersArg := c.String("containers")
-	return &testConfig{
+	return &TestConfig{
 		Containers: strings.Split(containersArg, ","),
-		PSK:        c.String("psk"),
+		Psk:        c.String("psk"),
 		Host:       c.String("host"),
-		Delete:     c.Bool("delete"),
-		PerSecond:  c.Float64("rate"),
+		IndexDelete:     c.Bool("delete"),
+		HitSize:	c.Float64("hitsize"),
+		Concurrency:  c.Float64("concurrency"),
+		ESHost: c.String("eshost"),
+		ESPort: c.String("esport"),
+		ESIndex: c.String("esindex"),
 	}
 }
 
-type reporter struct {
-	host  string
-	psk   string
-}
-
-func NewReporter(host, psk string) *reporter {
-	return &reporter{
-		host:  host,
-		psk:   psk,
+func NewReporter(host, psk string) *Reporter {
+	return &Reporter{
+		Host:  host,
+		Psk:   psk,
 	}
 }
 
 func reportAction(c *cli.Context) error {
 	ctx := c.Context
 	conf := NewConfig(c)
-
-	reporter := NewReporter(conf.Host, conf.PSK)
-
-	g, ctx := errgroup.WithContext(ctx)
-	for i := 0;  i < len(conf.Containers); i++ {
-		cc := conf.Containers[i]
-		g.Go(func() error {
-			err := reporter.reportForContainer(ctx, cc, conf.Delete)
-			if err != nil {
-				zlog.Error(ctx).Str("container", cc).Msg(err.Error())
-				return nil
-			}
-			zlog.Debug(ctx).Str("container", cc).Msg("completed")
-			return nil
-		})
-	}
-
-	err := g.Wait()
-	if err != nil {
-		return err
-	}
-
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	err = enc.Encode(conf)
+	// reporter := NewReporter(conf.Host, conf.Psk)
+	listOfManifests := manifests.getManifest(ctx, conf.Containers)
+	fmt.Printf("%v", listOfManifests)
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	var err error
+	err = encoder.Encode(conf)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (r *reporter) reportForContainer(ctx context.Context, container string, delete bool) error {
+func (r *Reporter) reportForContainer(ctx context.Context, container string, delete bool) error {
 	// Call clairctl for the manifest
 	manifest, err := getManifest(ctx, container)
 	if err != nil {
@@ -134,9 +127,9 @@ func (r *reporter) reportForContainer(ctx context.Context, container string, del
 	}
 	// Get a token
 	logout.Debug().Str("container", container).Msg("got manifest")
-	token, err := token.CreateToken(r.psk)
+	token, err := token.CreateToken(r.Psk)
 	if err != nil {
-		zlog.Debug(ctx).Str("PSK", r.psk).Msg("creating token")
+		zlog.Debug(ctx).Str("PSK", r.Psk).Msg("creating token")
 		return fmt.Errorf("could not create token: %w", err)
 	}
 	// Send manifest as body to index_report
@@ -173,24 +166,18 @@ func (r *reporter) reportForContainer(ctx context.Context, container string, del
 	return nil
 }
 
-func getManifest(ctx context.Context, container string) ([]byte, error) {
-	cmd := exec.Command("clairctl", "manifest", container)
-	zlog.Debug(ctx).Str("container", cmd.String()).Msg("getting manifest")
-	return cmd.Output()
-}
-
-func (r *reporter) createIndexReport(ctx context.Context, body []byte, token string) (string, error) {
-    url := r.host + "/indexer/api/v1/index_report"
+func (r *Reporter) createIndexReport(ctx context.Context, body []byte, token string) (string, error) {
+    url := r.Host + "/indexer/api/v1/index_report"
 	headers := map[string][]string{
 		"Content-Type": {"application/json"},
 		"Authorization": {fmt.Sprintf("Bearer %s", token)},
 	}
-	var blob Blob
+	var blob ManifestHash
 	err := json.Unmarshal(body, &blob)
 	if err != nil {
 		fmt.Println("Handling error here")
 	}
-	hashToReturn := blob.Hash
+	hashToReturn := blob.ManifestHash
 	var vegetaData []map[string]interface{}
 	vegetaData = append(vegetaData, map[string]interface{}{
 		"method":  "POST",
@@ -203,8 +190,8 @@ func (r *reporter) createIndexReport(ctx context.Context, body []byte, token str
 	return hashToReturn, nil
 }
 
-func (r *reporter) getIndexReport(ctx context.Context, hash string, token string) error {
-	url := r.host+"/indexer/api/v1/index_report/"+hash
+func (r *Reporter) getIndexReport(ctx context.Context, hash string, token string) error {
+	url := r.Host+"/indexer/api/v1/index_report/"+hash
 	headers := map[string][]string{
 		"Content-Type": {"application/json"},
 		"Authorization": {fmt.Sprintf("Bearer %s", token)},
@@ -221,8 +208,8 @@ func (r *reporter) getIndexReport(ctx context.Context, hash string, token string
 	return nil
 }
 
-func (r *reporter) getIndexerState(ctx context.Context, token string) error {
-	url := r.host+"/indexer/api/v1/index_state"
+func (r *Reporter) getIndexerState(ctx context.Context, token string) error {
+	url := r.Host+"/indexer/api/v1/index_state"
 	headers := map[string][]string{
 		"Content-Type": {"application/json"},
 		"Authorization": {fmt.Sprintf("Bearer %s", token)},
@@ -239,8 +226,8 @@ func (r *reporter) getIndexerState(ctx context.Context, token string) error {
 	return nil
 }
 
-func (r *reporter) getVulnerabilityReport(ctx context.Context, hash string, token string) error {
-	url := r.host+"/matcher/api/v1/vulnerability_report/"+hash
+func (r *Reporter) getVulnerabilityReport(ctx context.Context, hash string, token string) error {
+	url := r.Host+"/matcher/api/v1/vulnerability_report/"+hash
 	headers := map[string][]string{
 		"Content-Type": {"application/json"},
 		"Authorization": {fmt.Sprintf("Bearer %s", token)},
@@ -257,8 +244,8 @@ func (r *reporter) getVulnerabilityReport(ctx context.Context, hash string, toke
 	return nil
 }
 
-func (r *reporter) deleteIndexReports(ctx context.Context, hash string, token string) error {
-	url := r.host+"/indexer/api/v1/index_report/"+hash
+func (r *Reporter) deleteIndexReports(ctx context.Context, hash string, token string) error {
+	url := r.Host+"/indexer/api/v1/index_report/"+hash
 	headers := map[string][]string{
 		"Content-Type": {"application/json"},
 		"Authorization": {fmt.Sprintf("Bearer %s", token)},
@@ -274,7 +261,6 @@ func (r *reporter) deleteIndexReports(ctx context.Context, hash string, token st
 	run_vegeta(vegetaData, "delete_vulnerability_report")
 	return nil
 }
-
 
 func run_vegeta(requestDicts []map[string]interface{}, testName string) {
 
