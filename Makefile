@@ -12,7 +12,7 @@ GIT_COMMIT = $(shell git rev-parse HEAD)
 VERSION ?= $(shell hack/tag_name.sh)
 SOURCES := $(shell find . -type f -name "*.go")
 BUILD_DATE = $(shell date '+%Y-%m-%d-%H:%M:%S')
-CLAIR_LOAD_TEST_VERSION= github.com/cloud-bulldozer/clair-load-test/pkg/version
+CLAIR_LOAD_TEST_VERSION= github.com/vishnuchalla/clair-load-test/pkg/version
 
 # Containers
 ENGINE ?= podman
