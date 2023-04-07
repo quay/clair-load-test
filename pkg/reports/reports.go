@@ -105,7 +105,6 @@ func reportAction(c *cli.Context) error {
 		zlog.Debug(ctx).Str("PSK", conf.Psk).Msg("creating token")
 		return fmt.Errorf("could not create token: %w", err)
 	}
-	fmt.Println(listOfManifestHashes)
 	orchestrateWorkload(ctx, listOfManifests, listOfManifestHashes, jwt_token, conf)
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
