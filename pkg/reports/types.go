@@ -11,8 +11,3 @@ type TestConfig struct {
 	ESPort		string 		 `json:"esport"`
 	ESIndex		string 		 `json:"esindex"`
 }
-
-type Reporter struct {
-	Host  string
-	Psk   string
-}

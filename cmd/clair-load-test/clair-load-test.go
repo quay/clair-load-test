@@ -39,6 +39,7 @@ func setLogLevel(c *cli.Context) error {
 	return nil
 }
 
+// Main method to drive clair-load-test.
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

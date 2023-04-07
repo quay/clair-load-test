@@ -10,11 +10,13 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
+// Method fixed contants for generating token.
 const (
 	TokenIssuer          = "clairctl"
 	TokenValidityPeriod  = time.Hour * 24 * 7
 )
 
+// Method to handle createtoken CLI.
 var CreateTokenCmd = &cli.Command{
 	Name:        "createtoken",
 	Description: "Creates a JWT token given a psk",
@@ -30,6 +32,7 @@ var CreateTokenCmd = &cli.Command{
 	},
 }
 
+// Method to drive create token action from the CLI options.
 func createTokenAction(c *cli.Context) error {
 	ctx := c.Context
 	key := c.String("key")
@@ -42,6 +45,7 @@ func createTokenAction(c *cli.Context) error {
 	return nil
 }
 
+// Method to create a token using the psk key.
 func CreateToken(key string) (tok string, err error) {
 	decKey, err := getSigningKey(key)
 	if err != nil {
@@ -67,10 +71,12 @@ func CreateToken(key string) (tok string, err error) {
 
 }
 
+// Method to get signing algorithm for token.
 func getSigningAlgorithm() jose.SignatureAlgorithm {
 	return jose.HS256
 }
 
+// Method to fetch signing key.
 func getSigningKey(key string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(key)
 }

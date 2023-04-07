@@ -1,6 +1,5 @@
-#!/usr/bin/env bash
-MODE=${MODE:-$1}
-MODE=${MODE:-run}
+#!/bin/bash
+
 IMAGES=${IMAGES:-"quay.io/clair-load-test/ubuntu:xenial,\
 quay.io/clair-load-test/ubuntu:focal,\
 quay.io/clair-load-test/ubuntu:impish,\
@@ -45,38 +44,27 @@ quay.io/clair-load-test/joomla:php7.4,\
 quay.io/clair-load-test/hadoop:latest,\
 quay.io/clair-load-test/quay-rhel8:v3.6.4-2,\
 quay.io/clair-load-test/debian:buster"}
-HOST=${HOST:-"http://localhost:6060"}
-DELETE=${DELETE:0}
 
-display_usage() {
-    echo "Usage: ${0} <shell|run|help>"
-    echo
-    echo "The first argument needs to be one of the above modes"
-    echo "if no argument is supplied the default is \"run\"."
-    echo "\"help\" displays this message"
-}
+# Set the Dockerfile contents
+unique_id=$(cat /proc/sys/kernel/random/uuid)
+dockerfile=$(cat << EOF
+FROM quay.io/jitesoft/alpine
+RUN echo $unique_id > /tmp/key.txt
+EOF
+)
 
-if [[ "${MODE}" = "help" ]]
-then
-    display_usage
-    exit 0
-fi
+# Set the tag name
+tag="myimage"
 
-index() {
-    time clair-load-test -D report \
-        --containers ${IMAGES} \
-        --host=${HOST} \
-        --delete=${DELETE} \
-        --psk="${PSK}"
-}
+# Build the Docker image using Podman
+echo "$dockerfile" | podman build \
+  --tag "$tag" \
+  --storage-opt "overlay.mount_program=/usr/bin/fuse-overlayfs" \
+  --storage-driver overlay \
+  -
 
-case "$MODE" in
-    "shell")
-        echo "Entering shell mode"
-        exec /bin/bash
-        ;;
-    "run")
-        echo "Running loadtest"
-         index 2>&1
-        ;;
-esac
+# Push the Docker image to a registry using Podman
+podman push "$tag" \
+  --tls-verify=false \
+  --storage-opt "overlay.mount_program=/usr/bin/fuse-overlayfs" \
+  --storage-driver overlay
