@@ -1,5 +1,6 @@
 package reports
 
+// Type to store the test config.
 type TestConfig struct {
 	Containers []string      `json:"containers"`
 	Psk        string        `json:"-"`
