@@ -1,5 +1,8 @@
 #!/bin/bash
 
+NUM_OF_TAGS=${NUM_OF_TAGS:-1}
+RATE=${RATE:-16}
+LOAD_REPO=${LOAD_REPO:-"quay.io/vchalla/clair-load-test"}
 IMAGES=${IMAGES:-"quay.io/clair-load-test/ubuntu:xenial,\
 quay.io/clair-load-test/ubuntu:focal,\
 quay.io/clair-load-test/ubuntu:impish,\
@@ -44,27 +47,36 @@ quay.io/clair-load-test/joomla:php7.4,\
 quay.io/clair-load-test/hadoop:latest,\
 quay.io/clair-load-test/quay-rhel8:v3.6.4-2,\
 quay.io/clair-load-test/debian:buster"}
-
 # Set the Dockerfile contents
 unique_id=$(cat /proc/sys/kernel/random/uuid)
-dockerfile=$(cat << EOF
-FROM quay.io/jitesoft/alpine
-RUN echo $unique_id > /tmp/key.txt
+for image in ${IMAGES//,/ }; do
+# Extracts tag lastword
+tag_prefix=$(basename "$image")
+lastword=${tag_prefix##*/}
+lastword=${lastword/:/_}
+# Set the tag name and upload them (uses multiprocessing)
+seq 1 $NUM_OF_TAGS | xargs -I {} -P $RATE bash -c '
+  i="$1"
+  # unique docker file to have unique manifest
+  dockerfile=$(cat << EOF
+FROM $4
+RUN echo $5$i > /tmp/key.txt
 EOF
 )
-
-# Set the tag name
-tag="myimage"
-
-# Build the Docker image using Podman
-echo "$dockerfile" | podman build \
-  --tag "$tag" \
-  --storage-opt "overlay.mount_program=/usr/bin/fuse-overlayfs" \
-  --storage-driver overlay \
-  -
-
-# Push the Docker image to a registry using Podman
-podman push "$tag" \
-  --tls-verify=false \
-  --storage-opt "overlay.mount_program=/usr/bin/fuse-overlayfs" \
-  --storage-driver overlay
+  tag_name="$2:$3_tag_$i"
+  # Build the Docker image using Podman
+  echo "$dockerfile" | podman build \
+    --tag "$tag_name" \
+    --storage-opt "overlay.mount_program=/usr/bin/fuse-overlayfs" \
+    --storage-driver overlay \
+    -
+  # Push the Docker image to a registry using Podman
+  podman push "$tag_name" \
+    --tls-verify=false \
+    --storage-opt "overlay.mount_program=/usr/bin/fuse-overlayfs" \
+    --storage-driver overlay
+' _ {} "$LOAD_REPO" "$lastword" "$image" "$unique_id" &
+done
+# Note: Use the below command to kill this process.
+# sudo pkill -f 'podman.*--tag'
+# Sample execution: NUM_OF_TAGS=100000 IMAGES="quay.io/clair-load-test/mysql:8.0.25" LOAD_REPO="quay.io/vchalla/clair-load-test" RATE=20 bash image_load.sh
