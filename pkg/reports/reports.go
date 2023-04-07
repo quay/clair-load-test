@@ -10,13 +10,11 @@ import (
 	"os/exec"
 	"strings"
 	"github.com/quay/zlog"
-	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v2"
 	"github.com/vishnuchalla/clair-load-test/pkg/token"
 	"github.com/vishnuchalla/clair-load-test/pkg/manifests"
 )
 
-var logout zerolog.Logger
 
 var ReportsCmd = &cli.Command{
 	Name:        "report",
@@ -119,144 +117,101 @@ func reportAction(c *cli.Context) error {
 }
 
 func orchestrateWorkload(ctx context.Context, manifests [][]byte, manifestHashes []string, jwt_token string, conf *TestConfig) {
-	return
+	zlog.Debug(ctx).Msg("Orchestrating reports workload")
+	var requests []map[string]interface{}
+	var testName string
+	requests, testName = createIndexReport(ctx, manifests, conf.Host, jwt_token)
+	run_vegeta(requests, testName)
+
+	requests, testName = getIndexReport(ctx, manifestHashes, conf.Host, jwt_token)
+	run_vegeta(requests, testName)
+
+	requests, testName = getVulnerabilityReport(ctx, manifestHashes, conf.Host, jwt_token)
+	run_vegeta(requests, testName)
+
+	requests, testName = getIndexerState(ctx, conf.HitSize, conf.Host, jwt_token)
+	run_vegeta(requests, testName)
+
+	if (conf.IndexDelete) {
+		requests, testName = deleteIndexReports(ctx, manifestHashes, conf.Host, jwt_token)
+		run_vegeta(requests, testName)
+	}
 }
 
-// func (r *Reporter) reportForContainer(ctx context.Context, container string, delete bool) error {
-// 	// Get a token
-// 	logout.Debug().Str("container", container).Msg("got manifest")
-// 	token, err := token.CreateToken(r.Psk)
-// 	if err != nil {
-// 		zlog.Debug(ctx).Str("PSK", r.Psk).Msg("creating token")
-// 		return fmt.Errorf("could not create token: %w", err)
-// 	}
-// 	// Send manifest as body to index_report
-// 	hash, err := r.createIndexReport(ctx, manifest, token)
-// 	if err != nil {
-// 		return fmt.Errorf("could not create index report: %w", err)
-// 	}
+func getRequestCommons(endpoint, host, token string) (string, map[string][]string) {
+	url := host + endpoint
+	headers := map[string][]string{
+		"Content-Type": {"application/json"},
+		"Authorization": {fmt.Sprintf("Bearer %s", token)},
+	}
+	return url, headers
+}
 
-// 	// Request index report
-// 	err = r.getIndexReport(ctx, hash, token)
-// 	if err != nil {
-// 		return fmt.Errorf("could not get index report: %w", err)
-// 	}
+func createIndexReport(ctx context.Context, manifests [][]byte, host, token string) ([]map[string]interface{}, string) {
+    url, headers := getRequestCommons("/indexer/api/v1/index_report", host, token)
+	var requests []map[string]interface{}
+	for _, manifest := range manifests {
+		requests = append(requests, map[string]interface{}{
+			"method":  "POST",
+			"url":     url,
+			"header": headers,
+			"body":    manifest,
+		})
+	}
+	return requests, "post_index_report"
+}
 
-// 	// Get a token
-// 	// Request vuln report
-// 	err = r.getVulnerabilityReport(ctx, hash, token)
-// 	if err != nil {
-// 		return fmt.Errorf("could not get vulnerability report: %w", err)
-// 	}
-// 	// Delete index_report
-// 	if delete {
-// 		err = r.deleteIndexReports(ctx, hash, token)
-// 		if err != nil {
-// 			return fmt.Errorf("could not delete index report: %w", err)
-// 		}
-// 	}
+func getIndexReport(ctx context.Context, manifestHashes []string, host, token string) ([]map[string]interface{}, string) {
+	url, headers := getRequestCommons("/indexer/api/v1/index_report/", host, token)
+	var requests []map[string]interface{}
+	for _, manifestHash := range manifestHashes {
+		requests = append(requests, map[string]interface{}{
+			"method":  "GET",
+			"url":     url + manifestHash,
+			"header": headers,
+		})
+	}
+	return requests, "get_index_report"
+}
 
-// 	// Request indexer state
-// 	err = r.getIndexerState(ctx, token)
-// 	if err != nil {
-// 		return fmt.Errorf("could not get index report: %w", err)
-// 	}
-// 	return nil
-// }
+func deleteIndexReports(ctx context.Context, manifestHashes []string, host, token string) ([]map[string]interface{}, string) {
+	url, headers := getRequestCommons("/indexer/api/v1/index_report/", host, token)
+	var requests []map[string]interface{}
+	for _, manifestHash := range manifestHashes {
+		requests = append(requests, map[string]interface{}{
+			"method":  "DELETE",
+			"url":     url + manifestHash,
+			"header": headers,
+		})
+	}
+	return requests, "delete_index_report"
+}
 
-// func (r *Reporter) createIndexReport(ctx context.Context, body []byte, token string) (string, error) {
-//     url := r.Host + "/indexer/api/v1/index_report"
-// 	headers := map[string][]string{
-// 		"Content-Type": {"application/json"},
-// 		"Authorization": {fmt.Sprintf("Bearer %s", token)},
-// 	}
-// 	err := json.Unmarshal(body, &blob)
-// 	if err != nil {
-// 		fmt.Println("Handling error here")
-// 	}
-// 	var vegetaData []map[string]interface{}
-// 	vegetaData = append(vegetaData, map[string]interface{}{
-// 		"method":  "POST",
-// 		"url":     url,
-// 		"header": headers,
-// 		"body":    body,
-// 	})
+func getVulnerabilityReport(ctx context.Context, manifestHashes []string, host, token string) ([]map[string]interface{}, string) {
+	url, headers := getRequestCommons("/matcher/api/v1/vulnerability_report/", host, token)
+	var requests []map[string]interface{}
+	for _, manifestHash := range manifestHashes {
+		requests = append(requests, map[string]interface{}{
+			"method":  "GET",
+			"url":     url + manifestHash,
+			"header": headers,
+		})
+	}
+	return requests, "get_vulnerability_report"
+}
 
-// 	run_vegeta(vegetaData,"post_index_report")
-// 	return "nil", nil
-// }
-
-// func (r *Reporter) getIndexReport(ctx context.Context, hash string, token string) error {
-// 	url := r.Host+"/indexer/api/v1/index_report/"+hash
-// 	headers := map[string][]string{
-// 		"Content-Type": {"application/json"},
-// 		"Authorization": {fmt.Sprintf("Bearer %s", token)},
-// 	}
-// 	zlog.Debug(ctx).Str("hash", hash).Msg("getting index report")
-// 	var vegetaData []map[string]interface{}
-// 	vegetaData = append(vegetaData, map[string]interface{}{
-// 		"method":  "GET",
-// 		"url":     url,
-// 		"header": headers,
-// 	})
-
-// 	run_vegeta(vegetaData, "get_index_report")
-// 	return nil
-// }
-
-// func (r *Reporter) getIndexerState(ctx context.Context, token string) error {
-// 	url := r.Host+"/indexer/api/v1/index_state"
-// 	headers := map[string][]string{
-// 		"Content-Type": {"application/json"},
-// 		"Authorization": {fmt.Sprintf("Bearer %s", token)},
-// 	}
-// 	zlog.Debug(ctx).Msg("getting indexer state")
-// 	var vegetaData []map[string]interface{}
-// 	vegetaData = append(vegetaData, map[string]interface{}{
-// 		"method":  "GET",
-// 		"url":     url,
-// 		"header": headers,
-// 	})
-
-// 	run_vegeta(vegetaData, "get_indexer_state")
-// 	return nil
-// }
-
-// func (r *Reporter) getVulnerabilityReport(ctx context.Context, hash string, token string) error {
-// 	url := r.Host+"/matcher/api/v1/vulnerability_report/"+hash
-// 	headers := map[string][]string{
-// 		"Content-Type": {"application/json"},
-// 		"Authorization": {fmt.Sprintf("Bearer %s", token)},
-// 	}
-// 	zlog.Debug(ctx).Str("hash", hash).Msg("getting vulnerability report")
-// 	var vegetaData []map[string]interface{}
-// 	vegetaData = append(vegetaData, map[string]interface{}{
-// 		"method":  "GET",
-// 		"url":     url,
-// 		"header": headers,
-// 	})
-
-// 	run_vegeta(vegetaData, "get_vulnerability_report")
-// 	return nil
-// }
-
-// func (r *Reporter) deleteIndexReports(ctx context.Context, hash string, token string) error {
-// 	url := r.Host+"/indexer/api/v1/index_report/"+hash
-// 	headers := map[string][]string{
-// 		"Content-Type": {"application/json"},
-// 		"Authorization": {fmt.Sprintf("Bearer %s", token)},
-// 	}
-// 	zlog.Debug(ctx).Str("hash", hash).Msg("deleting index report")
-// 	var vegetaData []map[string]interface{}
-// 	vegetaData = append(vegetaData, map[string]interface{}{
-// 		"method":  "DELETE",
-// 		"url":     url,
-// 		"header": headers,
-// 	})
-
-// 	run_vegeta(vegetaData, "delete_vulnerability_report")
-// 	return nil
-// }
+func getIndexerState(ctx context.Context, hitsize float64, host, token string) ([]map[string]interface{}, string) {
+	url, headers := getRequestCommons("/indexer/api/v1/index_state", host, token)
+	var requests []map[string]interface{}
+	for i := 0; i < int(hitsize); i++ {
+		requests = append(requests, map[string]interface{}{
+			"method":  "GET",
+			"url":     url,
+			"header": headers,
+		})
+	}
+	return requests, "get_indexer_state"
+}
 
 func run_vegeta(requestDicts []map[string]interface{}, testName string) {
 
