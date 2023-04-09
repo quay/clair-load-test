@@ -1,6 +1,7 @@
 #!/bin/bash
 
-NUM_OF_TAGS=${NUM_OF_TAGS:-1}
+START=${START:-1}
+END=${END:-10000}
 RATE=${RATE:-16}
 LOAD_REPO=${LOAD_REPO:-"quay.io/vchalla/clair-load-test"}
 IMAGES=${IMAGES:-"quay.io/clair-load-test/ubuntu:xenial,\
@@ -55,7 +56,7 @@ tag_prefix=$(basename "$image")
 lastword=${tag_prefix##*/}
 lastword=${lastword/:/_}
 # Set the tag name and upload them (uses multiprocessing)
-seq 1 $NUM_OF_TAGS | xargs -I {} -P $RATE bash -c '
+seq $START $END | xargs -I {} -P $RATE bash -c '
   i="$1"
   # unique docker file to have unique manifest
   dockerfile=$(cat << EOF
@@ -79,4 +80,4 @@ EOF
 done
 # Note: Use the below command to kill this process.
 # sudo pkill -f 'podman.*--tag'
-# Sample execution: NUM_OF_TAGS=100000 IMAGES="quay.io/clair-load-test/mysql:8.0.25" LOAD_REPO="quay.io/vchalla/clair-load-test" RATE=20 bash image_load.sh
+# Sample execution: START=1 END=10000 IMAGES="quay.io/clair-load-test/mysql:8.0.25" LOAD_REPO="quay.io/vchalla/clair-load-test" RATE=20 bash image_load.sh

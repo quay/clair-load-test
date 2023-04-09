@@ -1,21 +1,21 @@
 package reports
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
+	"github.com/google/uuid"
 	"github.com/quay/zlog"
 	"github.com/urfave/cli/v2"
+	"github.com/vishnuchalla/clair-load-test/pkg/attacker"
 	"github.com/vishnuchalla/clair-load-test/pkg/token"
+	"github.com/vishnuchalla/clair-load-test/pkg/utils"
 	"github.com/vishnuchalla/clair-load-test/pkg/manifests"
 )
 
-
+// Command line to handle reports functionality.
 var ReportsCmd = &cli.Command{
 	Name:        "report",
 	Description: "request reports for named containers",
@@ -27,6 +27,12 @@ var ReportsCmd = &cli.Command{
 			Usage:   "--host localhost:6060/",
 			Value:   "http://localhost:6060/",
 			EnvVars: []string{"CLAIR_TEST_HOST"},
+		},
+		&cli.StringFlag{
+			Name:    "uuid",
+			Usage:   "--uuid f519d9b2-aa62-44ab-9ce8-4156b712f6d2",
+			Value:   uuid.New().String(),
+			EnvVars: []string{"CLAIR_TEST_UUID"},
 		},
 		&cli.StringFlag{
 			Name:    "containers",
@@ -64,13 +70,13 @@ var ReportsCmd = &cli.Command{
 			Value:   false,
 			EnvVars: []string{"INDEX_REPORT_DELETE"},
 		},
-		&cli.Float64Flag{
+		&cli.IntFlag{
 			Name:    "hitsize",
 			Usage:   "--hitsize 100",
 			Value:   25,
 			EnvVars: []string{"CLAIR_TEST_HIT_SIZE"},
 		},
-		&cli.Float64Flag{
+		&cli.IntFlag{
 			Name:    "concurrency",
 			Usage:   "--concurrency 50",
 			Value:   10,
@@ -80,21 +86,23 @@ var ReportsCmd = &cli.Command{
 }
 
 // Method to create a test configuration from CLI options.
-func NewConfig(c *cli.Context) *TestConfig {
+func NewConfig(c *cli.Context) *utils.TestConfig {
 	containersArg := c.String("containers")
-	return &TestConfig{
+	return &utils.TestConfig{
 		Containers: strings.Split(containersArg, ","),
 		Psk:        c.String("psk"),
+		Uuid:		c.String("uuid"),
 		Host:       c.String("host"),
 		IndexDelete:     c.Bool("delete"),
-		HitSize:	c.Float64("hitsize"),
-		Concurrency:  c.Float64("concurrency"),
+		HitSize:	c.Int("hitsize"),
+		Concurrency:  c.Int("concurrency"),
 		ESHost: c.String("eshost"),
 		ESPort: c.String("esport"),
 		ESIndex: c.String("esindex"),
 	}
 }
 
+// Method to report action based on parameters.
 func reportAction(c *cli.Context) error {
 	ctx := c.Context
 	conf := NewConfig(c)
@@ -115,124 +123,26 @@ func reportAction(c *cli.Context) error {
 	return nil
 }
 
-func orchestrateWorkload(ctx context.Context, manifests [][]byte, manifestHashes []string, jwt_token string, conf *TestConfig) {
+// Method to orchestrate the workload.
+func orchestrateWorkload(ctx context.Context, manifests [][]byte, manifestHashes []string, jwt_token string, conf *utils.TestConfig) {
 	zlog.Debug(ctx).Msg("Orchestrating reports workload")
+	zlog.Info(ctx).Str("Uuid", conf.Uuid).Msg("Run details")
 	var requests []map[string]interface{}
 	var testName string
 	requests, testName = CreateIndexReport(ctx, manifests, conf.Host, jwt_token)
-	run_vegeta(requests, testName)
+	attacker.runVegeta(requests, testName, conf)
 
 	requests, testName = GetIndexReport(ctx, manifestHashes, conf.Host, jwt_token)
-	run_vegeta(requests, testName)
+	attacker.runVegeta(requests, testName, conf)
 
 	requests, testName = GetVulnerabilityReport(ctx, manifestHashes, conf.Host, jwt_token)
-	run_vegeta(requests, testName)
+	attacker.runVegeta(requests, testName, conf)
 
 	requests, testName = GetIndexerState(ctx, len(manifests), conf.Host, jwt_token)
-	run_vegeta(requests, testName)
+	attacker.runVegeta(requests, testName, conf)
 
 	if (conf.IndexDelete) {
 		requests, testName = DeleteIndexReports(ctx, manifestHashes, conf.Host, jwt_token)
-		run_vegeta(requests, testName)
+		attacker.runVegeta(requests, testName, conf)
 	}
-}
-
-func run_vegeta(requestDicts []map[string]interface{}, testName string) {
-
-	// Convert requestDicts to a slice of Vegeta requests
-	var requests string = ""
-	for _, reqDict := range requestDicts {
-		req := make(map[string]interface{})
-		req["url"] = reqDict["url"]
-		req["method"] = reqDict["method"]
-
-		// Encode the body as base64-encoded JSON if the request method is not GET
-		if reqDict["body"] != nil && reqDict["method"] != "GET" {
-			if body, ok := reqDict["body"].([]byte); ok {
-				req["body"] = base64.StdEncoding.EncodeToString(body)
-			}
-		}
-
-		// Set the request headers
-		if headers, ok := reqDict["header"]; ok {
-			req["header"] = headers
-		} else {
-			req["header"] = map[string][]string{
-				"Authorization": {"Bearer " + os.Getenv("AUTH_TOKEN")},
-				"Content-Type":  {"application/json"},
-			}
-		}
-		reqString, err := json.Marshal(req)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error encoding request: %v\n", err)
-			os.Exit(1)
-		}
-		requests += string(reqString) + "\n"
-	}
-
-	if strings.TrimSpace(requests) == "" {
-		panic("Something is wrong with requests. Requests string cannot be empty")
-	}
-
-	// Ensure a directory exists for writing vegeta results
-	log_directory := "./logs"
-	if _, err := os.Stat(log_directory); os.IsNotExist(err) {
-		if err := os.MkdirAll(log_directory, 0755); err != nil {
-			// Handle the error here
-			panic(err)
-		}
-	}
-
-	// Run `vegeta attack` to execute the HTTP Requests
-	cmd := exec.Command("vegeta", "attack", "-lazy", "-format=json", "-rate", "100", "-insecure")
-	cmd.Stdin = strings.NewReader(requests)
-	output, err := cmd.Output()
-	if err != nil {
-		panic(err)
-	}
-
-	// Show Vegeta Stats
-	cmd = exec.Command("vegeta", "report")
-	cmd.Stdin = strings.NewReader(string(output))
-	cmd.Stdout = os.Stdout
-	err = cmd.Run()
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("Vegeta attack completed successfully")
-
-	// Write Vegeta Stats to a file
-	result_filename := fmt.Sprintf("%s/%s_%s_result.json", log_directory, "TEST_UUID", testName)
-	cmd = exec.Command("vegeta", "report", "--every=1s", "--type=json", fmt.Sprintf("--output=%s", result_filename))
-	cmd.Stdin = strings.NewReader(string(output))
-	err = cmd.Run()
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("Results for test %s written to file: %s\n", testName, result_filename)
-
-	// Use Snafu to push results to Elasticsearch
-	fmt.Printf("Recording test results in ElasticSearch: %s\n", "https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com")
-	cmd = exec.Command("run_snafu",
-		"-t", "vegeta",
-		"-u", "TEST_UUID",
-		"-w", fmt.Sprintf("%d", 100),
-		"-r", result_filename,
-		"--target_name", testName,
-	)
-	cmd.Env = []string{
-		fmt.Sprintf("es=%s", "https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com"),
-		fmt.Sprintf("es_port=%s", "443"),
-		fmt.Sprintf("es_index=%s", "cliar-test-index"),
-		fmt.Sprintf("clustername=%s", "example-registry-clair-app-quay-enterprise.apps.vchalla-quay-test.perfscale.devcluster.openshift.com"),
-	}
-	var stdout bytes.Buffer
-    var stderr bytes.Buffer
-    cmd.Stdout = &stdout
-    cmd.Stderr = &stderr
-    if err := cmd.Run(); err != nil {
-        panic(err)
-    }
-    fmt.Printf("stdout: %s", stdout.String())
-    fmt.Printf("stderr: %s", stderr.String())
 }
