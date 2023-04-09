@@ -130,19 +130,19 @@ func orchestrateWorkload(ctx context.Context, manifests [][]byte, manifestHashes
 	var requests []map[string]interface{}
 	var testName string
 	requests, testName = CreateIndexReport(ctx, manifests, conf.Host, jwt_token)
-	attacker.runVegeta(requests, testName, conf)
+	attacker.RunVegeta(requests, testName, conf)
 
 	requests, testName = GetIndexReport(ctx, manifestHashes, conf.Host, jwt_token)
-	attacker.runVegeta(requests, testName, conf)
+	attacker.RunVegeta(requests, testName, conf)
 
 	requests, testName = GetVulnerabilityReport(ctx, manifestHashes, conf.Host, jwt_token)
-	attacker.runVegeta(requests, testName, conf)
+	attacker.RunVegeta(requests, testName, conf)
 
 	requests, testName = GetIndexerState(ctx, len(manifests), conf.Host, jwt_token)
-	attacker.runVegeta(requests, testName, conf)
+	attacker.RunVegeta(requests, testName, conf)
 
 	if (conf.IndexDelete) {
 		requests, testName = DeleteIndexReports(ctx, manifestHashes, conf.Host, jwt_token)
-		attacker.runVegeta(requests, testName, conf)
+		attacker.RunVegeta(requests, testName, conf)
 	}
 }

@@ -99,7 +99,7 @@ func indexVegetaResults(resultFileName, testName string, conf *utils.TestConfig)
 }
 
 // Method to trigger vegeta workflow.
-func runVegeta(requestDicts []map[string]interface{}, testName string, conf *utils.TestConfig) {
+func RunVegeta(requestDicts []map[string]interface{}, testName string, conf *utils.TestConfig) {
 	requests := generateVegetaRequests(requestDicts)
 	// Run `vegeta attack` to execute the HTTP Requests
 	cmd := exec.Command("vegeta", "attack", "-lazy", "-format=json", "-rate", strconv.Itoa(conf.Concurrency), "-insecure")
