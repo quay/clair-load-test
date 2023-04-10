@@ -4,6 +4,7 @@ package utils
 type TestConfig struct {
 	Containers []string      `json:"containers"`
 	Concurrency  int     `json:"concurrency"`
+	TestRepoPrefix string	`json:"testrepoprefix"`
 	ESHost		string		 `json:"eshost"`
 	ESPort		string 		 `json:"esport"`
 	ESIndex		string 		 `json:"esindex"`

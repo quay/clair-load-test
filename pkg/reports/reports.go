@@ -41,6 +41,12 @@ var ReportsCmd = &cli.Command{
 			EnvVars: []string{"CLAIR_TEST_CONTAINERS"},
 		},
 		&cli.StringFlag{
+			Name:	"testrepoprefix",
+			Usage:  "--testrepoprefix quay.io/vchalla/clair-load-test:mysql_8.0.25",
+			Value: 	"",
+			EnvVars: []string{"CLAIR_TEST_REPO_PREFIX"},
+		},
+		&cli.StringFlag{
 			Name:    "psk",
 			Usage:   "--psk secretkey",
 			Value:   "",
@@ -90,6 +96,7 @@ func NewConfig(c *cli.Context) *utils.TestConfig {
 	containersArg := c.String("containers")
 	return &utils.TestConfig{
 		Containers: strings.Split(containersArg, ","),
+		TestRepoPrefix: c.String("testrepoprefix"),
 		Psk:        c.String("psk"),
 		Uuid:		c.String("uuid"),
 		Host:       c.String("host"),
@@ -106,6 +113,13 @@ func NewConfig(c *cli.Context) *utils.TestConfig {
 func reportAction(c *cli.Context) error {
 	ctx := c.Context
 	conf := NewConfig(c)
+	if((c.String("containers") == "" && conf.TestRepoPrefix == "") || ((c.String("containers") != "") && conf.TestRepoPrefix != "")) {
+		return fmt.Errorf("Please specify either of --containers or --testrepoprefix options. Both are mutually exclusive")
+	}
+	if(conf.TestRepoPrefix != ""){
+		conf.Containers = utils.GetContainersList(ctx, conf.TestRepoPrefix, conf.HitSize)
+	}
+	conf.Containers = conf.Containers[:conf.HitSize]
 	listOfManifests, listOfManifestHashes := manifests.GetManifest(ctx, conf.Containers)
 	var err error
 	jwt_token, err := token.CreateToken(conf.Psk)

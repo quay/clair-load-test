@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"context"
+	"strconv"
 
 	"github.com/quay/zlog"
 )
@@ -16,4 +17,13 @@ func GetRequestCommons(ctx context.Context, endpoint, host, token string) (strin
 		"Authorization": {fmt.Sprintf("Bearer %s", token)},
 	}
 	return url, headers
+}
+
+// Method to return list of containers using repo prefix.
+func GetContainersList(ctx context.Context, testRepoPrefix string, hitSize int) ([]string) {
+	var containers []string
+	for i := 1; i <= hitSize; i++ {
+		containers = append(containers, testRepoPrefix + "_tag_" + strconv.Itoa(i))
+	}
+	return containers
 }
