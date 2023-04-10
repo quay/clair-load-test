@@ -74,7 +74,7 @@ var ReportsCmd = &cli.Command{
 			Name:    "delete",
 			Usage:   "--delete",
 			Value:   false,
-			EnvVars: []string{"INDEX_REPORT_DELETE"},
+			EnvVars: []string{"CLAIR_TEST_INDEX_REPORT_DELETE"},
 		},
 		&cli.IntFlag{
 			Name:    "hitsize",
