@@ -12,8 +12,8 @@ import (
 
 // Method fixed contants for generating token.
 const (
-	TokenIssuer          = "clairctl"
-	TokenValidityPeriod  = time.Hour * 24 * 7
+	TokenIssuer         = "clairctl"
+	TokenValidityPeriod = time.Hour * 24 * 7
 )
 
 // Method to handle createtoken CLI.

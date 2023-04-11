@@ -8,8 +8,8 @@ import (
 	"github.com/quay/zlog"
 	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v2"
-	"github.com/vishnuchalla/clair-load-test/pkg/token"
 	"github.com/vishnuchalla/clair-load-test/pkg/reports"
+	"github.com/vishnuchalla/clair-load-test/pkg/token"
 )
 
 var logout zerolog.Logger

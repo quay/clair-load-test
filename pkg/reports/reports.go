@@ -4,15 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"strings"
 	"github.com/google/uuid"
 	"github.com/quay/zlog"
 	"github.com/urfave/cli/v2"
 	"github.com/vishnuchalla/clair-load-test/pkg/attacker"
+	"github.com/vishnuchalla/clair-load-test/pkg/manifests"
 	"github.com/vishnuchalla/clair-load-test/pkg/token"
 	"github.com/vishnuchalla/clair-load-test/pkg/utils"
-	"github.com/vishnuchalla/clair-load-test/pkg/manifests"
+	"os"
+	"strings"
 )
 
 // Command line to handle reports functionality.
@@ -41,9 +41,9 @@ var ReportsCmd = &cli.Command{
 			EnvVars: []string{"CLAIR_TEST_CONTAINERS"},
 		},
 		&cli.StringFlag{
-			Name:	"testrepoprefix",
-			Usage:  "--testrepoprefix quay.io/vchalla/clair-load-test:mysql_8.0.25",
-			Value: 	"",
+			Name:    "testrepoprefix",
+			Usage:   "--testrepoprefix quay.io/vchalla/clair-load-test:mysql_8.0.25",
+			Value:   "",
 			EnvVars: []string{"CLAIR_TEST_REPO_PREFIX"},
 		},
 		&cli.StringFlag{
@@ -95,17 +95,17 @@ var ReportsCmd = &cli.Command{
 func NewConfig(c *cli.Context) *utils.TestConfig {
 	containersArg := c.String("containers")
 	return &utils.TestConfig{
-		Containers: strings.Split(containersArg, ","),
+		Containers:     strings.Split(containersArg, ","),
 		TestRepoPrefix: c.String("testrepoprefix"),
-		Psk:        c.String("psk"),
-		Uuid:		c.String("uuid"),
-		Host:       c.String("host"),
-		IndexDelete:     c.Bool("delete"),
-		HitSize:	c.Int("hitsize"),
-		Concurrency:  c.Int("concurrency"),
-		ESHost: c.String("eshost"),
-		ESPort: c.String("esport"),
-		ESIndex: c.String("esindex"),
+		Psk:            c.String("psk"),
+		Uuid:           c.String("uuid"),
+		Host:           c.String("host"),
+		IndexDelete:    c.Bool("delete"),
+		HitSize:        c.Int("hitsize"),
+		Concurrency:    c.Int("concurrency"),
+		ESHost:         c.String("eshost"),
+		ESPort:         c.String("esport"),
+		ESIndex:        c.String("esindex"),
 	}
 }
 
@@ -113,10 +113,10 @@ func NewConfig(c *cli.Context) *utils.TestConfig {
 func reportAction(c *cli.Context) error {
 	ctx := c.Context
 	conf := NewConfig(c)
-	if((c.String("containers") == "" && conf.TestRepoPrefix == "") || ((c.String("containers") != "") && conf.TestRepoPrefix != "")) {
+	if (c.String("containers") == "" && conf.TestRepoPrefix == "") || ((c.String("containers") != "") && conf.TestRepoPrefix != "") {
 		return fmt.Errorf("Please specify either of --containers or --testrepoprefix options. Both are mutually exclusive")
 	}
-	if(conf.TestRepoPrefix != ""){
+	if conf.TestRepoPrefix != "" {
 		conf.Containers = utils.GetContainersList(ctx, conf.TestRepoPrefix, conf.HitSize)
 	}
 	conf.Containers = conf.Containers[:conf.HitSize]
@@ -155,7 +155,7 @@ func orchestrateWorkload(ctx context.Context, manifests [][]byte, manifestHashes
 	requests, testName = GetIndexerState(ctx, len(manifests), conf.Host, jwt_token)
 	attacker.RunVegeta(requests, testName, conf)
 
-	if (conf.IndexDelete) {
+	if conf.IndexDelete {
 		requests, testName = DeleteIndexReports(ctx, manifestHashes, conf.Host, jwt_token)
 		attacker.RunVegeta(requests, testName, conf)
 	}

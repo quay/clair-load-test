@@ -1,19 +1,19 @@
 package attacker
 
 import (
-	"os"
-	"fmt"
 	"bytes"
-	"strings"
-	"strconv"
-	"os/exec"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"github.com/vishnuchalla/clair-load-test/pkg/utils"
+	"os"
+	"os/exec"
+	"strconv"
+	"strings"
 )
 
 // Method to generate requests string to feed it as input to vegeta.
-func generateVegetaRequests(requestDicts []map[string]interface{}) (string) {
+func generateVegetaRequests(requestDicts []map[string]interface{}) string {
 	// Convert requestDicts to a slice of Vegeta requests
 	var requests string = ""
 	for _, reqDict := range requestDicts {
@@ -49,7 +49,7 @@ func generateVegetaRequests(requestDicts []map[string]interface{}) (string) {
 }
 
 // Method to write vegeta results to log file.
-func writeVegetaResults(Uuid, testName string, vegetaOutput []byte) (string) {
+func writeVegetaResults(Uuid, testName string, vegetaOutput []byte) string {
 	// Ensure a directory exists for writing vegeta results
 	log_directory := "./logs"
 	if _, err := os.Stat(log_directory); os.IsNotExist(err) {
@@ -71,7 +71,7 @@ func writeVegetaResults(Uuid, testName string, vegetaOutput []byte) (string) {
 }
 
 // Method to index vegeta results using snafu wrapper.
-func indexVegetaResults(resultFileName, testName string, conf *utils.TestConfig){
+func indexVegetaResults(resultFileName, testName string, conf *utils.TestConfig) {
 	// Use Snafu to push results to Elasticsearch
 	fmt.Printf("Recording test results into ElasticSearch: %s\n", conf.ESHost)
 	cmd := exec.Command("run_snafu",

@@ -11,14 +11,14 @@ import (
 // Method to test POST operation in index report.
 func CreateIndexReport(ctx context.Context, manifests [][]byte, host, token string) ([]map[string]interface{}, string) {
 	zlog.Debug(ctx).Str("requests", strconv.Itoa(len(manifests))).Msg("preparing requests for POST operation in index_report")
-    url, headers := utils.GetRequestCommons(ctx, "/indexer/api/v1/index_report", host, token)
+	url, headers := utils.GetRequestCommons(ctx, "/indexer/api/v1/index_report", host, token)
 	var requests []map[string]interface{}
 	for _, manifest := range manifests {
 		requests = append(requests, map[string]interface{}{
-			"method":  "POST",
-			"url":     url,
+			"method": "POST",
+			"url":    url,
 			"header": headers,
-			"body":    manifest,
+			"body":   manifest,
 		})
 	}
 	return requests, "post_index_report"
@@ -31,8 +31,8 @@ func GetIndexReport(ctx context.Context, manifestHashes []string, host, token st
 	var requests []map[string]interface{}
 	for _, manifestHash := range manifestHashes {
 		requests = append(requests, map[string]interface{}{
-			"method":  "GET",
-			"url":     url + manifestHash,
+			"method": "GET",
+			"url":    url + manifestHash,
 			"header": headers,
 		})
 	}
@@ -46,8 +46,8 @@ func DeleteIndexReports(ctx context.Context, manifestHashes []string, host, toke
 	var requests []map[string]interface{}
 	for _, manifestHash := range manifestHashes {
 		requests = append(requests, map[string]interface{}{
-			"method":  "DELETE",
-			"url":     url + manifestHash,
+			"method": "DELETE",
+			"url":    url + manifestHash,
 			"header": headers,
 		})
 	}
@@ -61,8 +61,8 @@ func GetVulnerabilityReport(ctx context.Context, manifestHashes []string, host, 
 	var requests []map[string]interface{}
 	for _, manifestHash := range manifestHashes {
 		requests = append(requests, map[string]interface{}{
-			"method":  "GET",
-			"url":     url + manifestHash,
+			"method": "GET",
+			"url":    url + manifestHash,
 			"header": headers,
 		})
 	}
@@ -76,8 +76,8 @@ func GetIndexerState(ctx context.Context, hitsize int, host, token string) ([]ma
 	var requests []map[string]interface{}
 	for i := 0; i < int(hitsize); i++ {
 		requests = append(requests, map[string]interface{}{
-			"method":  "GET",
-			"url":     url,
+			"method": "GET",
+			"url":    url,
 			"header": headers,
 		})
 	}

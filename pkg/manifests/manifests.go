@@ -1,12 +1,12 @@
 package manifests
 
 import (
-	"fmt"
-	"sync"
 	"context"
-	"os/exec"
 	"encoding/json"
+	"fmt"
 	"github.com/quay/zlog"
+	"os/exec"
+	"sync"
 )
 
 // Method to execute clairctl manifest command.
@@ -32,18 +32,18 @@ func GetManifest(ctx context.Context, containers []string) ([][]byte, []string) 
 			manifest, err := execClairCtl(ctx, cc)
 			if err != nil {
 				results <- result{index: i, container: cc, err: fmt.Errorf("could not generate manifest: %w", err)}
-            	return
+				return
 			}
 			err = json.Unmarshal(manifest, &blob)
 			if err != nil {
 				results <- result{index: i, container: cc, err: fmt.Errorf("could not extract hash from manifest: %w", err)}
-            	return
+				return
 			}
 			mu.Lock()
 			defer mu.Unlock()
 			listOfManifests[i] = manifest
 			listOfManifestHashes[i] = blob.ManifestHash
-			results <- result{index:i}
+			results <- result{index: i}
 		}(i)
 	}
 	go func() {
@@ -57,4 +57,3 @@ func GetManifest(ctx context.Context, containers []string) ([][]byte, []string) 
 	close(results)
 	return listOfManifests, listOfManifestHashes
 }
-
