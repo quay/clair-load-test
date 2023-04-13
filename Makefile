@@ -1,5 +1,5 @@
 
-.PHONY: build clean help images push
+.PHONY: build help images push
 
 
 ARCH ?= amd64
@@ -16,7 +16,7 @@ REGISTRY = quay.io
 ORG ?= vchalla
 CONTAINER_NAME_ARCH = $(REGISTRY)/$(ORG)/clair-load-test:$(ARCH)
 
-all: build images push
+all: lint build images push
 
 help:
 	@echo "Commands for $(BIN_PATH):"
@@ -39,16 +39,6 @@ $(BIN_PATH): $(SOURCES)
 lint:
 	find . -name '*.go' -type f -exec go fmt {} \;
 	golangci-lint run
-
-clean:
-	test ! -e $(BIN_DIR) || rm -Rf $(BIN_PATH)
-
-vendor:
-	go mod vendor
-
-deps-update:
-	go mod tidy
-	go mod vendor
 
 install:
 	cp $(BIN_PATH) /usr/bin/$(BIN_NAME)
