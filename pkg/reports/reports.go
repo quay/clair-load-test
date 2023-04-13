@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/quay/clair-load-test/attacker"
+	"github.com/quay/clair-load-test/pkg/commons"
+	"github.com/quay/clair-load-test/pkg/manifests"
+	"github.com/quay/clair-load-test/pkg/token"
 	"github.com/quay/zlog"
 	"github.com/urfave/cli/v2"
-	"github.com/vishnuchalla/clair-load-test/pkg/attacker"
-	"github.com/vishnuchalla/clair-load-test/pkg/manifests"
-	"github.com/vishnuchalla/clair-load-test/pkg/token"
-	"github.com/vishnuchalla/clair-load-test/pkg/utils"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -91,14 +92,14 @@ var ReportsCmd = &cli.Command{
 	},
 }
 
-// Method to create a test configuration from CLI options.
-func NewConfig(c *cli.Context) *utils.TestConfig {
+// NewConfig creates and returns a test configuration from CLI options.
+func NewConfig(c *cli.Context) *commons.TestConfig {
 	containersArg := c.String("containers")
-	return &utils.TestConfig{
+	return &commons.TestConfig{
 		Containers:     strings.Split(containersArg, ","),
 		TestRepoPrefix: c.String("testrepoprefix"),
-		Psk:            c.String("psk"),
-		Uuid:           c.String("uuid"),
+		PSK:            c.String("psk"),
+		UUID:           c.String("uuid"),
 		Host:           c.String("host"),
 		IndexDelete:    c.Bool("delete"),
 		HitSize:        c.Int("hitsize"),
@@ -109,7 +110,18 @@ func NewConfig(c *cli.Context) *utils.TestConfig {
 	}
 }
 
-// Method to report action based on parameters.
+// getContainersList returns list of containers from test repo used in load phase.
+// It returns a list of strings which is a list of container names.
+func getContainersList(ctx context.Context, testRepoPrefix string, hitSize int) []string {
+	var containers []string
+	for i := 1; i <= hitSize; i++ {
+		containers = append(containers, testRepoPrefix+"_tag_"+strconv.Itoa(i))
+	}
+	return containers
+}
+
+// reportAction drives the report action logic.
+// It returns an error if any during the execution.
 func reportAction(c *cli.Context) error {
 	ctx := c.Context
 	conf := NewConfig(c)
@@ -117,17 +129,21 @@ func reportAction(c *cli.Context) error {
 		return fmt.Errorf("Please specify either of --containers or --testrepoprefix options. Both are mutually exclusive")
 	}
 	if conf.TestRepoPrefix != "" {
-		conf.Containers = utils.GetContainersList(ctx, conf.TestRepoPrefix, conf.HitSize)
+		conf.Containers = getContainersList(ctx, conf.TestRepoPrefix, conf.HitSize)
 	}
-	conf.Containers = conf.Containers[:conf.HitSize]
+	if len(conf.Containers) > conf.HitSize {
+		conf.Containers = conf.Containers[:conf.HitSize]
+	}
 	listOfManifests, listOfManifestHashes := manifests.GetManifest(ctx, conf.Containers)
-	var err error
-	jwt_token, err := token.CreateToken(conf.Psk)
+	jwt_token, err := token.CreateToken(conf.PSK)
 	if err != nil {
-		zlog.Debug(ctx).Str("PSK", conf.Psk).Msg("creating token")
+		zlog.Debug(ctx).Str("PSK", conf.PSK).Msg("creating token")
 		return fmt.Errorf("could not create token: %w", err)
 	}
-	orchestrateWorkload(ctx, listOfManifests, listOfManifestHashes, jwt_token, conf)
+	err = orchestrateWorkload(ctx, listOfManifests, listOfManifestHashes, jwt_token, conf)
+	if err != nil {
+		return err
+	}
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	err = encoder.Encode(conf)
@@ -137,26 +153,39 @@ func reportAction(c *cli.Context) error {
 	return nil
 }
 
-// Method to orchestrate the workload.
-func orchestrateWorkload(ctx context.Context, manifests [][]byte, manifestHashes []string, jwt_token string, conf *utils.TestConfig) {
+// orchestrateWorkload triggers the api endpoint hits and writes results to the desired location.
+// It returns an error if any during the execution.
+func orchestrateWorkload(ctx context.Context, manifests [][]byte, manifestHashes []string, jwt_token string, conf *commons.TestConfig) error {
 	zlog.Debug(ctx).Msg("Orchestrating reports workload")
-	zlog.Info(ctx).Str("Uuid", conf.Uuid).Msg("Run details")
+	zlog.Info(ctx).Str("UUID", conf.UUID).Msg("Run details")
 	var requests []map[string]interface{}
-	var testName string
-	requests, testName = CreateIndexReport(ctx, manifests, conf.Host, jwt_token)
-	attacker.RunVegeta(requests, testName, conf)
-
-	requests, testName = GetIndexReport(ctx, manifestHashes, conf.Host, jwt_token)
-	attacker.RunVegeta(requests, testName, conf)
-
-	requests, testName = GetVulnerabilityReport(ctx, manifestHashes, conf.Host, jwt_token)
-	attacker.RunVegeta(requests, testName, conf)
-
-	requests, testName = GetIndexerState(ctx, len(manifests), conf.Host, jwt_token)
-	attacker.RunVegeta(requests, testName, conf)
-
-	if conf.IndexDelete {
-		requests, testName = DeleteIndexReports(ctx, manifestHashes, conf.Host, jwt_token)
-		attacker.RunVegeta(requests, testName, conf)
+	var err error
+	requests = CreateIndexReportRequests(ctx, manifests, conf.Host, jwt_token)
+	err = attacker.RunVegeta(ctx, requests, "post_index_report", conf)
+	if err != nil {
+		return fmt.Errorf("Error while running POST operation on index_report: %w", err)
 	}
+	requests = GetIndexReportRequests(ctx, manifestHashes, conf.Host, jwt_token)
+	err = attacker.RunVegeta(ctx, requests, "get_index_report", conf)
+	if err != nil {
+		return fmt.Errorf("Error while running GET operation on index_report: %w", err)
+	}
+	requests = GetVulnerabilityReportRequests(ctx, manifestHashes, conf.Host, jwt_token)
+	err = attacker.RunVegeta(ctx, requests, "get_vulnerability_report", conf)
+	if err != nil {
+		return fmt.Errorf("Error while running GET operation on vulnerability_report: %w", err)
+	}
+	requests = GetIndexerStateRequests(ctx, len(manifests), conf.Host, jwt_token)
+	err = attacker.RunVegeta(ctx, requests, "get_indexer_state", conf)
+	if err != nil {
+		return fmt.Errorf("Error while running GET operation on indexer_state: %w", err)
+	}
+	if conf.IndexDelete {
+		requests = DeleteIndexReportsRequests(ctx, manifestHashes, conf.Host, jwt_token)
+		err = attacker.RunVegeta(ctx, requests, "delete_index_report", conf)
+		if err != nil {
+			return fmt.Errorf("Error while running DELETE operation on index_report: %w", err)
+		}
+	}
+	return nil
 }

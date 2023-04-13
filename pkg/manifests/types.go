@@ -7,7 +7,6 @@ type ManifestHash struct {
 
 // Type used to store results of channel.
 type result struct {
-	index     int
 	container string
 	err       error
 }

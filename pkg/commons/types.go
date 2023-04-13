@@ -1,4 +1,4 @@
-package utils
+package commons
 
 // Type to store the test config.
 type TestConfig struct {
@@ -11,6 +11,6 @@ type TestConfig struct {
 	Host           string   `json:"host"`
 	HitSize        int      `json:"hitsize"`
 	IndexDelete    bool     `json:"delete"`
-	Psk            string   `json:"-"`
-	Uuid           string   `json:"uuid"`
+	PSK            string   `json:"-"`
+	UUID           string   `json:"uuid"`
 }

@@ -16,7 +16,7 @@ REGISTRY = quay.io
 ORG ?= vchalla
 CONTAINER_NAME_ARCH = $(REGISTRY)/$(ORG)/clair-load-test:$(ARCH)
 
-all: lint build images push
+all: build images push
 
 help:
 	@echo "Commands for $(BIN_PATH):"

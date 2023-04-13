@@ -9,14 +9,16 @@ import (
 	"sync"
 )
 
-// Method to execute clairctl manifest command.
+// exeClairCtl executes the clairctl manifest command to fetch manifest.
+// It returns the manifest bytes and errors if any during the execution.
 func execClairCtl(ctx context.Context, container string) ([]byte, error) {
 	cmd := exec.Command("clairctl", "manifest", container)
 	zlog.Debug(ctx).Str("container", cmd.String()).Msg("getting manifest")
 	return cmd.Output()
 }
 
-// Method to process containers and extract their manifests.
+// GetManifest uses multiprocessing to get manifests and manifestHashes for a list of containers.
+// It returns a lists of manifests and manifestHashes.
 func GetManifest(ctx context.Context, containers []string) ([][]byte, []string) {
 	var blob ManifestHash
 	var wg sync.WaitGroup
@@ -31,19 +33,19 @@ func GetManifest(ctx context.Context, containers []string) ([][]byte, []string) 
 			cc := containers[i]
 			manifest, err := execClairCtl(ctx, cc)
 			if err != nil {
-				results <- result{index: i, container: cc, err: fmt.Errorf("could not generate manifest: %w", err)}
+				results <- result{container: cc, err: fmt.Errorf("could not generate manifest: %w", err)}
 				return
 			}
 			err = json.Unmarshal(manifest, &blob)
 			if err != nil {
-				results <- result{index: i, container: cc, err: fmt.Errorf("could not extract hash from manifest: %w", err)}
+				results <- result{container: cc, err: fmt.Errorf("could not extract hash from manifest: %w", err)}
 				return
 			}
 			mu.Lock()
 			defer mu.Unlock()
 			listOfManifests[i] = manifest
 			listOfManifestHashes[i] = blob.ManifestHash
-			results <- result{index: i}
+			results <- result{}
 		}(i)
 	}
 	go func() {

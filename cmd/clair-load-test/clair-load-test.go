@@ -5,11 +5,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/quay/clair-load-test/pkg/reports"
+	"github.com/quay/clair-load-test/pkg/token"
 	"github.com/quay/zlog"
 	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v2"
-	"github.com/vishnuchalla/clair-load-test/pkg/reports"
-	"github.com/vishnuchalla/clair-load-test/pkg/token"
 )
 
 var logout zerolog.Logger
@@ -26,6 +26,7 @@ func createLogger(level zerolog.Level, timeFormat string) zerolog.Logger {
 }
 
 // setLogLevel sets the log level based on the value of the "-D" and "-W" flags.
+// It returns an error if any during the execution.
 func setLogLevel(c *cli.Context) error {
 	level := zerolog.InfoLevel
 	if c.Bool("W") {
@@ -39,7 +40,7 @@ func setLogLevel(c *cli.Context) error {
 	return nil
 }
 
-// Main method to drive clair-load-test.
+// main drives the execution for clair-load-test.
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

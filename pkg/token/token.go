@@ -10,13 +10,13 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
-// Method fixed contants for generating token.
+// Constants defined here.
 const (
 	TokenIssuer         = "clairctl"
 	TokenValidityPeriod = time.Hour * 24 * 7
 )
 
-// Method to handle createtoken CLI.
+// CreateTokenCmd handles createtoken CLI.
 var CreateTokenCmd = &cli.Command{
 	Name:        "createtoken",
 	Description: "Creates a JWT token given a psk",
@@ -32,7 +32,8 @@ var CreateTokenCmd = &cli.Command{
 	},
 }
 
-// Method to drive create token action from the CLI options.
+// createTokenAction to drive token action from the CLI options.
+// It returns an error if any during the execution.
 func createTokenAction(c *cli.Context) error {
 	ctx := c.Context
 	key := c.String("key")
@@ -45,14 +46,15 @@ func createTokenAction(c *cli.Context) error {
 	return nil
 }
 
-// Method to create a token using the psk key.
+// CreateToken creates a token from the input PSK key.
+// It returns a token string and an error if any during the execution.
 func CreateToken(key string) (tok string, err error) {
-	decKey, err := getSigningKey(key)
+	decKey, err := base64.StdEncoding.DecodeString(key)
 	if err != nil {
 		return "", err
 	}
 	sk := jose.SigningKey{
-		Algorithm: getSigningAlgorithm(),
+		Algorithm: jose.HS256,
 		Key:       decKey,
 	}
 	s, err := jose.NewSigner(sk, nil)
@@ -68,15 +70,4 @@ func CreateToken(key string) (tok string, err error) {
 		IssuedAt:  jwt.NewNumericDate(now),
 		NotBefore: jwt.NewNumericDate(now),
 	}).CompactSerialize()
-
-}
-
-// Method to get signing algorithm for token.
-func getSigningAlgorithm() jose.SignatureAlgorithm {
-	return jose.HS256
-}
-
-// Method to fetch signing key.
-func getSigningKey(key string) ([]byte, error) {
-	return base64.StdEncoding.DecodeString(key)
 }

@@ -1,4 +1,4 @@
-module github.com/vishnuchalla/clair-load-test
+module github.com/quay/clair-load-test
 
 go 1.18
 
@@ -6,7 +6,7 @@ require (
 	github.com/quay/zlog v0.0.0-20210113185248-ce16eed1dcec
 	github.com/rs/zerolog v1.23.0
 	github.com/urfave/cli/v2 v2.25.1
-	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
+	golang.org/x/sync v0.1.0
 	gopkg.in/square/go-jose.v2 v2.6.0
 )
 
