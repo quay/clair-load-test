@@ -24,7 +24,8 @@ RUN mkdir -p /opt/snafu/ \
  && wget -O /tmp/benchmark-wrapper.tar.gz https://github.com/cloud-bulldozer/benchmark-wrapper/archive/refs/tags/v1.0.0.tar.gz \
  && tar -xzf /tmp/benchmark-wrapper.tar.gz -C /opt/snafu/ --strip-components=1 \
  && pip3 install --upgrade pip \
- && pip3 install -e /opt/snafu/
+ && pip3 install -e /opt/snafu/ \
+ && rm -rf /tmp/benchmark-wrapper.tar.gz
 
 # Cleanup the installation remainings
 RUN apt-get clean autoclean && \
