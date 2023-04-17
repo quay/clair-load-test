@@ -4,8 +4,11 @@ FROM ubuntu
 WORKDIR /tmp
 ARG DEBIAN_FRONTEND=noninteractive
 
-# Install necessary libraries for subsequent commands
-RUN apt-get update && apt-get install -y podman wget git dumb-init python3.6 python3-distutils python3-pip python3-apt
+# Install necessary libraries & cleanup for subsequent commands
+RUN apt-get update && apt-get install -y podman wget git dumb-init python3.6 python3-distutils python3-pip python3-apt \
+ && apt-get clean autoclean \
+ && apt-get autoremove --yes \
+ && rm -rf /var/lib/{apt,dpkg,cache,log}/
 
 # Install vegeta for HTTP benchmarking
 RUN wget https://github.com/tsenart/vegeta/releases/download/v12.8.3/vegeta-12.8.3-linux-amd64.tar.gz \
@@ -26,11 +29,6 @@ RUN mkdir -p /opt/snafu/ \
  && pip3 install --upgrade pip \
  && pip3 install -e /opt/snafu/ \
  && rm -rf /tmp/benchmark-wrapper.tar.gz
-
-# Cleanup the installation remainings
-RUN apt-get clean autoclean && \
-    apt-get autoremove --yes && \
-    rm -rf /var/lib/{apt,dpkg,cache,log}/
 
 # Copy binary and start the command
 COPY clair-load-test /bin/clair-load-test

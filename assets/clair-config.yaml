@@ -31,7 +31,7 @@ spec:
     spec:
       containers:
       - name: clair-testing
-        image: quay.io/vchalla/clair-load-test:0.0.1-amd64 
+        image: quay.io/vchalla/clair-load-test:amd64 
         securityContext:
           privileged: true
         env:
