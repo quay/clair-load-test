@@ -1,19 +1,18 @@
-package reports
+package main
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/quay/clair-load-test/attacker"
-	"github.com/quay/clair-load-test/pkg/commons"
-	"github.com/quay/clair-load-test/pkg/manifests"
-	"github.com/quay/clair-load-test/pkg/token"
-	"github.com/quay/zlog"
-	"github.com/urfave/cli/v2"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/google/uuid"
+	"github.com/quay/clair-load-test/attacker"
+	"github.com/quay/clair-load-test/manifests"
+	"github.com/quay/zlog"
+	"github.com/urfave/cli/v2"
 )
 
 // Command line to handle reports functionality.
@@ -92,10 +91,25 @@ var ReportsCmd = &cli.Command{
 	},
 }
 
+// Type to store the test config.
+type TestConfig struct {
+	Containers     []string `json:"containers"`
+	Concurrency    int      `json:"concurrency"`
+	TestRepoPrefix string   `json:"testrepoprefix"`
+	ESHost         string   `json:"eshost"`
+	ESPort         string   `json:"esport"`
+	ESIndex        string   `json:"esindex"`
+	Host           string   `json:"host"`
+	HitSize        int      `json:"hitsize"`
+	IndexDelete    bool     `json:"delete"`
+	PSK            string   `json:"-"`
+	UUID           string   `json:"uuid"`
+}
+
 // NewConfig creates and returns a test configuration from CLI options.
-func NewConfig(c *cli.Context) *commons.TestConfig {
+func NewConfig(c *cli.Context) *TestConfig {
 	containersArg := c.String("containers")
-	return &commons.TestConfig{
+	return &TestConfig{
 		Containers:     strings.Split(containersArg, ","),
 		TestRepoPrefix: c.String("testrepoprefix"),
 		PSK:            c.String("psk"),
@@ -134,8 +148,8 @@ func reportAction(c *cli.Context) error {
 	if len(conf.Containers) > conf.HitSize {
 		conf.Containers = conf.Containers[:conf.HitSize]
 	}
-	listOfManifests, listOfManifestHashes := manifests.GetManifest(ctx, conf.Containers)
-	jwt_token, err := token.CreateToken(conf.PSK)
+	listOfManifests, listOfManifestHashes := manifests.GetManifest(ctx, conf.Containers, conf.Concurrency)
+	jwt_token, err := CreateToken(conf.PSK)
 	if err != nil {
 		zlog.Debug(ctx).Str("PSK", conf.PSK).Msg("creating token")
 		return fmt.Errorf("could not create token: %w", err)
@@ -155,34 +169,42 @@ func reportAction(c *cli.Context) error {
 
 // orchestrateWorkload triggers the api endpoint hits and writes results to the desired location.
 // It returns an error if any during the execution.
-func orchestrateWorkload(ctx context.Context, manifests [][]byte, manifestHashes []string, jwt_token string, conf *commons.TestConfig) error {
+func orchestrateWorkload(ctx context.Context, manifests [][]byte, manifestHashes []string, jwt_token string, conf *TestConfig) error {
 	zlog.Debug(ctx).Msg("Orchestrating reports workload")
 	zlog.Info(ctx).Str("UUID", conf.UUID).Msg("Run details")
 	var requests []map[string]interface{}
 	var err error
-	requests = CreateIndexReportRequests(ctx, manifests, conf.Host, jwt_token)
-	err = attacker.RunVegeta(ctx, requests, "post_index_report", conf)
+	attackMap := map[string]string{
+		"UUID":        conf.UUID,
+		"Concurrency": strconv.Itoa(conf.Concurrency),
+		"ESHost":      conf.ESHost,
+		"ESPort":      conf.ESPort,
+		"ESIndex":     conf.ESIndex,
+		"Host":        conf.Host,
+	}
+	requests = attacker.CreateIndexReportRequests(ctx, manifests, conf.Host, jwt_token)
+	err = attacker.RunVegeta(ctx, requests, "post_index_report", attackMap)
 	if err != nil {
 		return fmt.Errorf("Error while running POST operation on index_report: %w", err)
 	}
-	requests = GetIndexReportRequests(ctx, manifestHashes, conf.Host, jwt_token)
-	err = attacker.RunVegeta(ctx, requests, "get_index_report", conf)
+	requests = attacker.GetIndexReportRequests(ctx, manifestHashes, conf.Host, jwt_token)
+	err = attacker.RunVegeta(ctx, requests, "get_index_report", attackMap)
 	if err != nil {
 		return fmt.Errorf("Error while running GET operation on index_report: %w", err)
 	}
-	requests = GetVulnerabilityReportRequests(ctx, manifestHashes, conf.Host, jwt_token)
-	err = attacker.RunVegeta(ctx, requests, "get_vulnerability_report", conf)
+	requests = attacker.GetVulnerabilityReportRequests(ctx, manifestHashes, conf.Host, jwt_token)
+	err = attacker.RunVegeta(ctx, requests, "get_vulnerability_report", attackMap)
 	if err != nil {
 		return fmt.Errorf("Error while running GET operation on vulnerability_report: %w", err)
 	}
-	requests = GetIndexerStateRequests(ctx, len(manifests), conf.Host, jwt_token)
-	err = attacker.RunVegeta(ctx, requests, "get_indexer_state", conf)
+	requests = attacker.GetIndexerStateRequests(ctx, len(manifests), conf.Host, jwt_token)
+	err = attacker.RunVegeta(ctx, requests, "get_indexer_state", attackMap)
 	if err != nil {
 		return fmt.Errorf("Error while running GET operation on indexer_state: %w", err)
 	}
 	if conf.IndexDelete {
-		requests = DeleteIndexReportsRequests(ctx, manifestHashes, conf.Host, jwt_token)
-		err = attacker.RunVegeta(ctx, requests, "delete_index_report", conf)
+		requests = attacker.DeleteIndexReportsRequests(ctx, manifestHashes, conf.Host, jwt_token)
+		err = attacker.RunVegeta(ctx, requests, "delete_index_report", attackMap)
 		if err != nil {
 			return fmt.Errorf("Error while running DELETE operation on index_report: %w", err)
 		}

@@ -33,5 +33,4 @@ RUN mkdir -p /opt/snafu/ \
 # Copy binary and start the command
 COPY clair-load-test /bin/clair-load-test
 LABEL io.k8s.display-name="clair-load-test"
-ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-CMD ["clair-load-test", "-D", "report"]
+ENTRYPOINT ["/usr/bin/dumb-init", "--", "sh", "-c", "ulimit -n 65536 && ulimit -p 65536 && clair-load-test -D report"]

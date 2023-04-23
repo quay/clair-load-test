@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/quay/zlog"
 	"os/exec"
 	"sync"
+
+	"github.com/quay/zlog"
 )
 
-// exeClairCtl executes the clairctl manifest command to fetch manifest.
+// execClairCtl executes the clairctl manifest command to fetch manifest.
 // It returns the manifest bytes and errors if any during the execution.
 func execClairCtl(ctx context.Context, container string) ([]byte, error) {
 	cmd := exec.Command("clairctl", "manifest", container)
@@ -17,9 +18,9 @@ func execClairCtl(ctx context.Context, container string) ([]byte, error) {
 	return cmd.Output()
 }
 
-// GetManifest uses multiprocessing to get manifests and manifestHashes for a list of containers.
+// batchProcess uses multiprocessing to get manifests and manifestHashes for a batch of containers.
 // It returns a lists of manifests and manifestHashes.
-func GetManifest(ctx context.Context, containers []string) ([][]byte, []string) {
+func batchProcess(ctx context.Context, containers []string) ([][]byte, []string) {
 	var blob ManifestHash
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -57,5 +58,24 @@ func GetManifest(ctx context.Context, containers []string) ([][]byte, []string) 
 	}()
 	wg.Wait()
 	close(results)
+	return listOfManifests, listOfManifestHashes
+}
+
+// GetManifest uses multiprocessing to get manifests and manifestHashes for a list of containers.
+// It returns a lists of manifests and manifestHashes.
+func GetManifest(ctx context.Context, containers []string, concurrency int) ([][]byte, []string) {
+	listOfManifests := make([][]byte, 0)
+	listOfManifestHashes := make([]string, 0)
+	// Process containers in batches
+	for i := 0; i < len(containers); i += concurrency {
+		end := i + concurrency
+		if end > len(containers) {
+			end = len(containers)
+		}
+		batch := containers[i:end]
+		manifestsBatch, manifestHashesBatch := batchProcess(ctx, batch)
+		listOfManifests = append(listOfManifests, manifestsBatch...)
+		listOfManifestHashes = append(listOfManifestHashes, manifestHashesBatch...)
+	}
 	return listOfManifests, listOfManifestHashes
 }

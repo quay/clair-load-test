@@ -6,13 +6,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/quay/clair-load-test/pkg/commons"
-	"github.com/quay/zlog"
 	"net/http"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
+
+	"github.com/quay/zlog"
 )
 
 // generateVegetaRequests generates requests string which can be fed as input to vegeta for HTTP benchmarking.
@@ -76,21 +75,21 @@ func writeVegetaResults(ctx context.Context, UUID, testName string, vegetaOutput
 
 // indexVegetaResults uses snafu to process vegeta output and index it to elastic search.
 // It returns an error if any during the execution.
-func indexVegetaResults(ctx context.Context, resultFileName, testName string, conf *commons.TestConfig) error {
+func indexVegetaResults(ctx context.Context, resultFileName, testName string, attackMap map[string]string) error {
 	// Use Snafu to push results to Elasticsearch
-	fmt.Printf("Recording test results into ElasticSearch: %s\n", conf.ESHost)
+	fmt.Printf("Recording test results into ElasticSearch: %s\n", attackMap["ESHost"])
 	cmd := exec.Command("run_snafu",
 		"-t", "vegeta",
-		"-u", conf.UUID,
-		"-w", strconv.Itoa(conf.Concurrency),
+		"-u", attackMap["UUID"],
+		"-w", attackMap["Concurrency"],
 		"-r", resultFileName,
 		"--target_name", testName,
 	)
 	cmd.Env = []string{
-		fmt.Sprintf("es=%s", conf.ESHost),
-		fmt.Sprintf("es_port=%s", conf.ESPort),
-		fmt.Sprintf("es_index=%s", conf.ESIndex),
-		fmt.Sprintf("clustername=%s", conf.Host),
+		fmt.Sprintf("es=%s", attackMap["ESHost"]),
+		fmt.Sprintf("es_port=%s", attackMap["ESPort"]),
+		fmt.Sprintf("es_index=%s", attackMap["ESIndex"]),
+		fmt.Sprintf("clustername=%s", attackMap["Host"]),
 	}
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -106,11 +105,11 @@ func indexVegetaResults(ctx context.Context, resultFileName, testName string, co
 
 // RunVegeta runs vegeta, records their results and indexes to elastic search if provided with connection details.
 // It returns an error if any during the execution.
-func RunVegeta(ctx context.Context, requestDicts []map[string]interface{}, testName string, conf *commons.TestConfig) error {
+func RunVegeta(ctx context.Context, requestDicts []map[string]interface{}, testName string, attackMap map[string]string) error {
 	var err error
 	requests := generateVegetaRequests(requestDicts)
 	// Run `vegeta attack` to execute the HTTP Requests
-	cmd := exec.Command("vegeta", "attack", "-lazy", "-format=json", "-rate", strconv.Itoa(conf.Concurrency), "-insecure")
+	cmd := exec.Command("vegeta", "attack", "-lazy", "-format=json", "-rate", attackMap["Concurrency"], "-insecure")
 	cmd.Stdin = strings.NewReader(requests)
 	vegetaOutput, err := cmd.Output()
 	if err != nil {
@@ -127,13 +126,13 @@ func RunVegeta(ctx context.Context, requestDicts []map[string]interface{}, testN
 		return err
 	}
 	zlog.Debug(ctx).Msg("Vegeta attack completed successfully")
-	resultFileName, err := writeVegetaResults(ctx, conf.UUID, testName, vegetaOutput)
+	resultFileName, err := writeVegetaResults(ctx, attackMap["UUID"], testName, vegetaOutput)
 	if err != nil {
 		zlog.Debug(ctx).Msg("Failed writing results to log dir")
 		return err
 	}
-	if conf.ESHost != "" && conf.ESPort != "" && conf.ESIndex != "" {
-		err = indexVegetaResults(ctx, resultFileName, testName, conf)
+	if attackMap["ESHost"] != "" && attackMap["ESPort"] != "" && attackMap["ESIndex"] != "" {
+		err = indexVegetaResults(ctx, resultFileName, testName, attackMap)
 		if err != nil {
 			zlog.Debug(ctx).Msg("Failed to indexing results to elastic search")
 			return err

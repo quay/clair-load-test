@@ -5,8 +5,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/quay/clair-load-test/pkg/reports"
-	"github.com/quay/clair-load-test/pkg/token"
 	"github.com/quay/zlog"
 	"github.com/rs/zerolog"
 	"github.com/urfave/cli/v2"
@@ -53,8 +51,8 @@ func main() {
 		EnableBashCompletion: true,
 		Before:               setLogLevel,
 		Commands: []*cli.Command{
-			reports.ReportsCmd,
-			token.CreateTokenCmd,
+			ReportsCmd,
+			CreateTokenCmd,
 		},
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
