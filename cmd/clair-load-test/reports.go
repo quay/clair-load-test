@@ -158,12 +158,6 @@ func reportAction(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	err = encoder.Encode(conf)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
