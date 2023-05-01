@@ -3,7 +3,8 @@
 START=${START:-1}
 END=${END:-10000}
 RATE=${RATE:-16}
-LAYER_SUFFIX=${LAYERS:-5}
+LAYERS=${LAYERS:-5}
+LAYER_SUFFIX=$LAYERS
 LAYERS=$((18 + ${LAYER_SUFFIX}))
 LOAD_REPO=${LOAD_REPO:-"quay.io/vchalla/clair-load-test"}
 IMAGES=${IMAGES:-"quay.io/clair-load-test/ubuntu:xenial,\
@@ -62,34 +63,33 @@ seq $START $END | xargs -I {} -P $RATE bash -c '
   i="$1"
   # unique docker file to have unique manifest
   dockerfile=$(cat <<EOF | head -n $6
-FROM ubuntu:latest as tarbuilder
+FROM registry.access.redhat.com/ubi8:latest as tarbuilder$5$i
 RUN echo "This is a sample file." > my_file$5$i.txt && tar -cf my_file$5$i.tar my_file$5$i.txt && rm -f my_file$5$i.txt
-FROM golang:1.17 as gobuilder
+FROM registry.access.redhat.com/ubi8/go-toolset:latest as gobuilder$5$i
 WORKDIR /app$5$i
-RUN echo "package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\"Hello, Docker!\")\n}" > main$5$i.go
+RUN echo -e "package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\"Hello, Docker!\")\n}" > main.go
 RUN go mod init my_app$5$i
-RUN go get -d -v
 RUN go build -o my_app$5$i
-FROM maven:3.8.3 as javabuilder
+FROM registry.access.redhat.com/ubi8/openjdk-8:1.3 as javabuilder$5$i
 WORKDIR /app$5$i
 RUN echo "public class HelloWorld { public static void main(String[] args) { System.out.println(\"Hello, Docker!\"); } }" > HelloWorld.java
 RUN javac HelloWorld.java && jar cfe my_app$5$i.jar HelloWorld HelloWorld.class
-FROM alpine AS shellbuilder
+FROM registry.access.redhat.com/ubi8:latest AS shellbuilder$5$i
 WORKDIR /app$5$i
 RUN echo "#!/bin/sh" > myscript$5$i.sh && echo "echo \"Hello, world!\"" >> myscript$5$i.sh
 FROM $4
 WORKDIR /app$5$i
 RUN apt-get update && apt-get install -y --no-install-recommends tar && rm -rf /var/lib/apt/lists/*
-COPY --from=tarbuilder my_file$5$i.tar /app$5$i/
-COPY --from=tarbuilder my_file$5$i.tar /build$5$i/app$5$5$i$i/
+COPY --from=tarbuilder$5$i my_file$5$i.tar /app$5$i/
+COPY --from=tarbuilder$5$i my_file$5$i.tar /build$5$i/app$5$5$i$i/
 RUN tar -xf /app$5$i/my_file$5$i.tar --overwrite
 RUN tar -xf /build$5$i/app$5$5$i$i/my_file$5$i.tar --overwrite
-COPY --from=gobuilder /app$5$i/my_app$5$i /app$5$i/
-COPY --from=gobuilder /app$5$i/my_app$5$i /build$5$i/app$5$5$i$i/
-COPY --from=javabuilder /app$5$i/my_app$5$i.jar /app$5$i/
-COPY --from=javabuilder /app$5$i/my_app$5$i.jar /build$5$i/app$5$5$i$i/
-COPY --from=shellbuilder /app$5$i/myscript$5$i.sh /app$5$i/
-COPY --from=shellbuilder /app$5$i/myscript$5$i.sh /build$5$i/app$5$5$i$i/
+COPY --from=gobuilder$5$i /app$5$i/my_app$5$i /app$5$i/
+COPY --from=gobuilder$5$i /app$5$i/my_app$5$i /build$5$i/app$5$5$i$i/
+COPY --from=javabuilder$5$i /app$5$i/my_app$5$i.jar /app$5$i/
+COPY --from=javabuilder$5$i /app$5$i/my_app$5$i.jar /build$5$i/app$5$5$i$i/
+COPY --from=shellbuilder$5$i /app$5$i/myscript$5$i.sh /app$5$i/
+COPY --from=shellbuilder$5$i /app$5$i/myscript$5$i.sh /build$5$i/app$5$5$i$i/
 RUN echo $5$i > /app$5$i/key$5$i.txt
 RUN echo $5$i > /build$5$i/app$5$5$i$i/key$5$i.txt
 RUN chmod +x /app$5$i/my_file$5$i.tar
@@ -126,7 +126,7 @@ EOF
 )
   tag_name="$2:$3_layers_$7_tag_$i"
   # Build the Docker image using Podman
-  echo "$dockerfile" | podman build --squash=false \
+  echo "$dockerfile" | podman build \
     --tag "$tag_name" \
     --storage-opt "overlay.mount_program=/usr/bin/fuse-overlayfs" \
     --storage-driver overlay \
