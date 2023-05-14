@@ -81,6 +81,12 @@ var ReportsCmd = &cli.Command{
 			EnvVars: []string{"CLAIR_TEST_HIT_SIZE"},
 		},
 		&cli.IntFlag{
+			Name:    "layers",
+			Usage:   "--layers 5",
+			Value:   5,
+			EnvVars: []string{"CLAIR_TEST_LAYERS"},
+		},
+		&cli.IntFlag{
 			Name:    "concurrency",
 			Usage:   "--concurrency 50",
 			Value:   10,
@@ -99,6 +105,7 @@ type TestConfig struct {
 	ESIndex        string   `json:"esindex"`
 	Host           string   `json:"host"`
 	HitSize        int      `json:"hitsize"`
+	Layers         int      `json:"layers"`
 	IndexDelete    bool     `json:"delete"`
 	PSK            string   `json:"-"`
 	UUID           string   `json:"uuid"`
@@ -115,6 +122,7 @@ func NewConfig(c *cli.Context) *TestConfig {
 		Host:           c.String("host"),
 		IndexDelete:    c.Bool("delete"),
 		HitSize:        c.Int("hitsize"),
+		Layers:         c.Int("layers"),
 		Concurrency:    c.Int("concurrency"),
 		ESHost:         c.String("eshost"),
 		ESPort:         c.String("esport"),
@@ -124,10 +132,10 @@ func NewConfig(c *cli.Context) *TestConfig {
 
 // getContainersList returns list of containers from test repo used in load phase.
 // It returns a list of strings which is a list of container names.
-func getContainersList(ctx context.Context, testRepoPrefix string, hitSize int) []string {
+func getContainersList(ctx context.Context, testRepoPrefix string, hitSize int, layers int) []string {
 	var containers []string
 	for i := 1; i <= hitSize; i++ {
-		containers = append(containers, testRepoPrefix+"_tag_"+strconv.Itoa(i))
+		containers = append(containers, testRepoPrefix+"_layers_"+strconv.Itoa(layers)+"_tag_"+strconv.Itoa(i))
 	}
 	return containers
 }
@@ -141,7 +149,7 @@ func reportAction(c *cli.Context) error {
 		return fmt.Errorf("Please specify either of --containers or --testrepoprefix options. Both are mutually exclusive")
 	}
 	if conf.TestRepoPrefix != "" {
-		conf.Containers = getContainersList(ctx, conf.TestRepoPrefix, conf.HitSize)
+		conf.Containers = getContainersList(ctx, conf.TestRepoPrefix, conf.HitSize, conf.Layers)
 	}
 	if len(conf.Containers) > conf.HitSize {
 		conf.Containers = conf.Containers[:conf.HitSize]

@@ -65,7 +65,9 @@ func batchProcess(ctx context.Context, containers []string) ([][]byte, []string)
 // It returns a lists of manifests and manifestHashes.
 func GetManifest(ctx context.Context, containers []string, concurrency int) ([][]byte, []string) {
 	listOfManifests := make([][]byte, 0)
+	updatedListOfManifests := make([][]byte, 0)
 	listOfManifestHashes := make([]string, 0)
+	updatedListOfManifestHashes := make([]string, 0)
 	// Process containers in batches
 	for i := 0; i < len(containers); i += concurrency {
 		end := i + concurrency
@@ -77,5 +79,15 @@ func GetManifest(ctx context.Context, containers []string, concurrency int) ([][
 		listOfManifests = append(listOfManifests, manifestsBatch...)
 		listOfManifestHashes = append(listOfManifestHashes, manifestHashesBatch...)
 	}
-	return listOfManifests, listOfManifestHashes
+	for _, subList := range listOfManifests {
+		if len(subList) > 0 {
+			updatedListOfManifests = append(updatedListOfManifests, subList)
+		}
+	}
+	for _, str := range listOfManifestHashes {
+		if str != "" {
+			updatedListOfManifestHashes = append(updatedListOfManifestHashes, str)
+		}
+	}
+	return updatedListOfManifests, updatedListOfManifestHashes
 }
