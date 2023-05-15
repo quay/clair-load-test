@@ -134,7 +134,7 @@ data:
             dist: {}
             repo: {}
       airgap: false
-      index_report_request_concurrency: 10
+      index_report_request_concurrency: -1
     matcher:
       connstring: host=postgres-clair port=5432 dbname=clair user=clair password=test123 sslmode=disable
       max_conn_pool: 100

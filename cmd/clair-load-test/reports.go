@@ -136,11 +136,16 @@ func NewConfig(c *cli.Context) *TestConfig {
 // It returns a list of strings which is a list of container names.
 func getContainersList(ctx context.Context, testRepoPrefix string, hitSize int, layers int, validLayers []int) []string {
 	var containers []string
+	var newLayers int
 	rand.Seed(time.Now().UnixNano())
 	for i := 1; i <= hitSize; i++ {
-		index := rand.Intn(len(validLayers) - 1)
-		layers := validLayers[1+index]
-		containers = append(containers, testRepoPrefix+"_layers_"+strconv.Itoa(layers)+"_tag_"+strconv.Itoa(i))
+		if layers == (-1) {
+			index := rand.Intn(len(validLayers) - 1)
+			newLayers = validLayers[1+index]
+		} else {
+			newLayers = layers
+		}
+		containers = append(containers, testRepoPrefix+"_layers_"+strconv.Itoa(newLayers)+"_tag_"+strconv.Itoa(i))
 	}
 	return containers
 }
