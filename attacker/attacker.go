@@ -109,7 +109,7 @@ func RunVegeta(ctx context.Context, requestDicts []map[string]interface{}, testN
 	var err error
 	requests := generateVegetaRequests(requestDicts)
 	// Run `vegeta attack` to execute the HTTP Requests
-	cmd := exec.Command("vegeta", "attack", "-lazy", "-format=json", "-rate", attackMap["Concurrency"], "-insecure")
+	cmd := exec.Command("vegeta", "attack", "-lazy", "-format=json", "-timeout=120s", "-rate", attackMap["Concurrency"], "-insecure")
 	cmd.Stdin = strings.NewReader(requests)
 	vegetaOutput, err := cmd.Output()
 	if err != nil {
