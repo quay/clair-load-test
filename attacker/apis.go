@@ -11,12 +11,12 @@ import (
 
 // getRequestCommons returns the common inputs for each and every HTTP request.
 // It returns a url and headers for the specified input.
-func getRequestCommons(ctx context.Context, endpoint, host, token string) (string, map[string][]string) {
+func getRequestCommons(ctx context.Context, endpoint, host, token string) (string, http.Header) {
 	url := host + endpoint
 	zlog.Debug(ctx).Str("endpoint", url).Msg("preparing headers")
-	headers := map[string][]string{
-		"Content-Type":  {"application/json"},
-		"Authorization": {fmt.Sprintf("Bearer %s", token)},
+	headers := http.Header{
+		"Content-Type":  []string{"application/json"},
+		"Authorization": []string{fmt.Sprintf("Bearer %s", token)},
 	}
 	return url, headers
 }
