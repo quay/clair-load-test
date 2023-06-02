@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/quay/clair-load-test/attacker"
@@ -81,6 +83,12 @@ var ReportsCmd = &cli.Command{
 			EnvVars: []string{"CLAIR_TEST_HIT_SIZE"},
 		},
 		&cli.IntFlag{
+			Name:    "layers",
+			Usage:   "--layers [-1, 5, 10, 15, 20, 25, 30, 35, 40]",
+			Value:   5,
+			EnvVars: []string{"CLAIR_TEST_LAYERS"},
+		},
+		&cli.IntFlag{
 			Name:    "concurrency",
 			Usage:   "--concurrency 50",
 			Value:   10,
@@ -99,6 +107,7 @@ type TestConfig struct {
 	ESIndex        string   `json:"esindex"`
 	Host           string   `json:"host"`
 	HitSize        int      `json:"hitsize"`
+	Layers         int      `json:"layers"`
 	IndexDelete    bool     `json:"delete"`
 	PSK            string   `json:"-"`
 	UUID           string   `json:"uuid"`
@@ -115,6 +124,7 @@ func NewConfig(c *cli.Context) *TestConfig {
 		Host:           c.String("host"),
 		IndexDelete:    c.Bool("delete"),
 		HitSize:        c.Int("hitsize"),
+		Layers:         c.Int("layers"),
 		Concurrency:    c.Int("concurrency"),
 		ESHost:         c.String("eshost"),
 		ESPort:         c.String("esport"),
@@ -124,10 +134,18 @@ func NewConfig(c *cli.Context) *TestConfig {
 
 // getContainersList returns list of containers from test repo used in load phase.
 // It returns a list of strings which is a list of container names.
-func getContainersList(ctx context.Context, testRepoPrefix string, hitSize int) []string {
+func getContainersList(ctx context.Context, testRepoPrefix string, hitSize int, layers int, validLayers []int) []string {
 	var containers []string
+	var newLayers int
+	rand.Seed(time.Now().UnixNano())
 	for i := 1; i <= hitSize; i++ {
-		containers = append(containers, testRepoPrefix+"_tag_"+strconv.Itoa(i))
+		if layers == (-1) {
+			index := rand.Intn(len(validLayers) - 1)
+			newLayers = validLayers[1+index]
+		} else {
+			newLayers = layers
+		}
+		containers = append(containers, testRepoPrefix+"_layers_"+strconv.Itoa(newLayers)+"_tag_"+strconv.Itoa(i))
 	}
 	return containers
 }
@@ -140,8 +158,19 @@ func reportAction(c *cli.Context) error {
 	if (c.String("containers") == "" && conf.TestRepoPrefix == "") || ((c.String("containers") != "") && conf.TestRepoPrefix != "") {
 		return fmt.Errorf("Please specify either of --containers or --testrepoprefix options. Both are mutually exclusive")
 	}
+	validLayers := []int{-1, 5, 10, 15, 20, 25, 30, 35, 40}
+	var validLayer bool
+	for _, layer := range validLayers {
+		if layer == conf.Layers {
+			validLayer = true
+			break
+		}
+	}
+	if !validLayer {
+		return fmt.Errorf("Invalid layer value. Must be one among: %v", validLayers)
+	}
 	if conf.TestRepoPrefix != "" {
-		conf.Containers = getContainersList(ctx, conf.TestRepoPrefix, conf.HitSize)
+		conf.Containers = getContainersList(ctx, conf.TestRepoPrefix, conf.HitSize, conf.Layers, validLayers)
 	}
 	if len(conf.Containers) > conf.HitSize {
 		conf.Containers = conf.Containers[:conf.HitSize]

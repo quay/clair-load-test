@@ -1,0 +1,294 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: quay-enterprise-serviceaccount
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - put
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+- apiGroups:
+  - extensions
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: quay-enterprise-secret-writer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: quay-enterprise-serviceaccount
+subjects:
+- kind: ServiceAccount
+  name: default
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-clair-storage
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: postgres-clair
+  name: postgres-clair
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-clair
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: postgres-clair
+    spec:
+      containers:
+      - env:
+        - name: POSTGRES_USER
+          value: clair
+        - name: POSTGRES_DB
+          value: clair
+        - name: POSTGRES_PASSWORD
+          value: test123
+        image: postgres
+        imagePullPolicy: IfNotPresent
+        name: postgres-clair
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+        ports:
+        - containerPort: 5432
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /var/lib/postgresql
+          name: postgredb
+      volumes:
+      - name: postgredb
+        persistentVolumeClaim:
+          claimName: postgres-clair-storage
+      terminationGracePeriodSeconds: 180
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: postgres-clair
+  name: postgres-clair
+spec:
+  ports:
+  - name: postgres
+    port: 5432
+    protocol: TCP
+    targetPort: 5432
+  selector:
+    app: postgres-clair
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clair-configmap
+data:
+  config.yaml: |
+    introspection_addr: ""
+    http_listen_addr: :8080
+    log_level: debug
+    indexer:
+      connstring: host=postgres-clair port=5432 dbname=clair user=clair password=test123 sslmode=disable
+      scanlock_retry: 10
+      layer_scan_concurrency: 10
+      migrations: true
+      scanner:
+            package: {}
+            dist: {}
+            repo: {}
+      airgap: false
+      index_report_request_concurrency: -1
+    matcher:
+      connstring: host=postgres-clair port=5432 dbname=clair user=clair password=test123 sslmode=disable
+      max_conn_pool: 100
+      indexer_addr: "http://clair-indexer"
+      migrations: true
+      period: 6h
+      disable_updaters: false
+    matchers:
+      names: null
+    notifier:
+      indexer_addr: "http://clair-indexer"
+      matcher_addr: "http://clair-matcher"
+      connstring: host=postgres-clair port=5432 dbname=clair user=clair password=test123 sslmode=disable
+      migrations: true
+      delivery_interval: 1m
+      poll_interval: 6h
+      amqp: null
+      stomp: null
+    auth:
+    psk:
+        key: Y2xhaXJzaGFyZWRwYXNzd29yZA==
+        iss:
+            - quay
+            - clairctl
+    metrics:
+      name: "prometheus"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clair-deployment
+spec:
+  selector:
+    matchLabels:
+      app: clair
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: clair
+    spec:
+      volumes:
+        - name: clair-config
+          configMap:
+            name: clair-configmap
+      containers:
+        - name: clair
+          image: quay.io/projectquay/clair:4.6.1
+          imagePullPolicy: IfNotPresent
+          ports:
+          - containerPort: 8080
+            name: clair-http
+            protocol: TCP
+          - containerPort: 8089
+            name: clair-intro
+            protocol: TCP
+          readinessProbe:
+            failureThreshold: 3
+            periodSeconds: 10
+            successThreshold: 1
+            tcpSocket:
+              port: 8080
+            timeoutSeconds: 1
+          startupProbe:
+            tcpSocket:
+              port: clair-intro
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            timeoutSeconds: 1
+            failureThreshold: 300
+          resources:
+            limits:
+              cpu: "4"
+              memory: 16Gi
+            requests:
+              cpu: "2"
+              memory: 2Gi
+          env:
+            - name: CLAIR_MODE
+              value: combo
+            - name: CLAIR_CONF
+              value: /clair/config.yaml
+          volumeMounts:
+            - name: clair-config
+              mountPath: /clair/config.yaml
+              subPath: config.yaml
+              readOnly: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clair-service
+spec:
+  selector:
+    app: clair
+  ports:
+    - name: clair-http
+      port: 80
+      protocol: TCP
+      targetPort: 8080
+    - name: clair-introspection
+      port: 8089
+      protocol: TCP
+      targetPort: 8089
+  type: ClusterIP
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: clair-route
+spec:
+  to:
+    kind: Service
+    name: clair-service
+  port:
+    targetPort: clair-http
+  wildcardPolicy: None
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: clair-service-monitor
+  labels:
+    app: clair
+spec:
+  selector:
+    matchLabels:
+      app: clair
+  endpoints:
+  - port: clair-introspection
+    path: /metrics
+    interval: 30s
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: clair-deployment
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: clair-deployment
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 90
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 90
