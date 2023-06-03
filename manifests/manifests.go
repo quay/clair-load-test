@@ -3,11 +3,11 @@ package manifests
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os/exec"
 	"sync"
 
 	"github.com/quay/zlog"
+	"golang.org/x/sync/errgroup"
 )
 
 // execClairCtl executes the clairctl manifest command to fetch manifest.
@@ -22,42 +22,31 @@ func execClairCtl(ctx context.Context, container string) ([]byte, error) {
 // It returns a lists of manifests and manifestHashes.
 func batchProcess(ctx context.Context, containers []string) ([][]byte, []string) {
 	var blob ManifestHash
-	var wg sync.WaitGroup
 	var mu sync.Mutex
 	listOfManifests := make([][]byte, len(containers))
 	listOfManifestHashes := make([]string, len(containers))
-	results := make(chan result)
-	for i := 0; i < len(containers); i++ {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			cc := containers[i]
+	errGroup, ctx := errgroup.WithContext(ctx)
+
+	for idx := 0; idx < len(containers); idx++ {
+		idx := idx // Capture loop variable
+		errGroup.Go(func() error {
+			cc := containers[idx]
 			manifest, err := execClairCtl(ctx, cc)
 			if err != nil {
-				results <- result{container: cc, err: fmt.Errorf("could not generate manifest: %w", err)}
-				return
+				zlog.Debug(ctx).Str("container", cc).Msg("Could not generate manifest")
 			}
 			err = json.Unmarshal(manifest, &blob)
 			if err != nil {
-				results <- result{container: cc, err: fmt.Errorf("could not extract hash from manifest: %w", err)}
-				return
+				zlog.Debug(ctx).Str("container", cc).Msg("Could not extract hash from manifest JSON")
 			}
 			mu.Lock()
 			defer mu.Unlock()
-			listOfManifests[i] = manifest
-			listOfManifestHashes[i] = blob.ManifestHash
-			results <- result{}
-		}(i)
+			listOfManifests[idx] = manifest
+			listOfManifestHashes[idx] = blob.ManifestHash
+			return nil
+		})
 	}
-	go func() {
-		for res := range results {
-			if res.err != nil {
-				zlog.Debug(ctx).Str("container", res.container).Msg(fmt.Sprintf("Error generating manifest for container. Message: %v", res.err))
-			}
-		}
-	}()
-	wg.Wait()
-	close(results)
+	_ = errGroup.Wait()
 	return listOfManifests, listOfManifestHashes
 }
 

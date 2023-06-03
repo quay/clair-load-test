@@ -59,15 +59,15 @@ func indexVegetaResults(ctx context.Context, metrics vegeta.Metrics, testName st
 		Index:              attackMap["ESIndex"],
 		InsecureSkipVerify: true,
 	}
-	zlog.Debug(ctx).Msg(fmt.Sprintf("Creating indexer: %s", indexerConfig.Type))
+	zlog.Debug(ctx).Msg("Creating opensearch indexer")
 	indexer, err := indexers.NewIndexer(indexerConfig)
 	if err != nil {
 		return fmt.Errorf("Failure while connnecting to Elasticsearch: %w", err)
 	}
-	zlog.Debug(ctx).Msg(fmt.Sprintf("Connected to : %s", indexerConfig.Servers[0]))
+	zlog.Debug(ctx).Str("server", indexerConfig.Servers[0]).Msg("Connected")
 	concurrency, _ := strconv.Atoi(attackMap["Concurrency"])
 	hostname, _ := os.Hostname()
-	zlog.Debug(ctx).Msg(fmt.Sprintf("Indexing documents in %s", attackMap["ESIndex"]))
+	zlog.Debug(ctx).Str("es-index", attackMap["ESIndex"]).Msg("Indexing documents")
 	resp, err := (*indexer).Index([]interface{}{Document{
 		Workload:       "clair-load-test",
 		Endpoint:       attackMap["Host"],
@@ -91,7 +91,7 @@ func indexVegetaResults(ctx context.Context, metrics vegeta.Metrics, testName st
 	if err != nil {
 		return fmt.Errorf(err.Error())
 	} else {
-		zlog.Debug(ctx).Msg(resp)
+		zlog.Debug(ctx).Msg(resp + "\n")
 	}
 	return nil
 }

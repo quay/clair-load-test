@@ -9,6 +9,7 @@ require (
 	github.com/rs/zerolog v1.23.0
 	github.com/tsenart/vegeta/v12 v12.8.4
 	github.com/urfave/cli/v2 v2.25.1
+	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	gopkg.in/square/go-jose.v2 v2.6.0
 )
 
