@@ -32,7 +32,7 @@ This will create 1 to 10000 tags of images specified in the load repo which will
 ### **Usage on openshift platform**
 Deploy `assets/clair-config.yaml` on to your openshift cluster.
 ### **Envs**
-* `CLAIR_TEST_HOST` - Sting indicating clair host to perform testing.
+* `CLAIR_TEST_HOST` - String indicating clair host to perform testing.
 * `CLAIR_TEST_CONTAINERS` - String with comma separated list of conatiner images.
 * `CLAIR_TEST_UUID`(Optional) - String specifying the desired UUID of the test run.
 * `CLAIR_TEST_PSK` - Psk string which can be found at `~/clair/config.yaml` in the clair app pod.
@@ -51,7 +51,7 @@ Create a yaml similar to `assets/clair-config.yaml` and apply it to a desired na
 ```
 oc apply -f ~/assets/clair-config.yaml
 ```
-Once deployed you should be able to see the details of the run in the pod logs with results getting logged and finally indexed to the target elsatic search index.
+Once deployed you should be able to see the details of the run in the pod logs with results getting logged and finally indexed to the target elastic search index.
 
 ### **Usage on Local Machine**
 ```

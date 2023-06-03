@@ -29,10 +29,10 @@ var ReportsCmd = &cli.Command{
 			EnvVars: []string{"CLAIR_TEST_HOST"},
 		},
 		&cli.StringFlag{
-			Name:    "uuid",
-			Usage:   "--uuid f519d9b2-aa62-44ab-9ce8-4156b712f6d2",
+			Name:    "runid",
+			Usage:   "--runid f519d9b2-aa62-44ab-9ce8-4156b712f6d2",
 			Value:   uuid.New().String(),
-			EnvVars: []string{"CLAIR_TEST_UUID"},
+			EnvVars: []string{"CLAIR_TEST_RUNID"},
 		},
 		&cli.StringFlag{
 			Name:    "containers",
@@ -110,7 +110,7 @@ type TestConfig struct {
 	Layers         int      `json:"layers"`
 	IndexDelete    bool     `json:"delete"`
 	PSK            string   `json:"-"`
-	UUID           string   `json:"uuid"`
+	RUNID          string   `json:"runid"`
 }
 
 // NewConfig creates and returns a test configuration from CLI options.
@@ -120,7 +120,7 @@ func NewConfig(c *cli.Context) *TestConfig {
 		Containers:     strings.Split(containersArg, ","),
 		TestRepoPrefix: c.String("testrepoprefix"),
 		PSK:            c.String("psk"),
-		UUID:           c.String("uuid"),
+		RUNID:          c.String("runid"),
 		Host:           c.String("host"),
 		IndexDelete:    c.Bool("delete"),
 		HitSize:        c.Int("hitsize"),
@@ -192,11 +192,11 @@ func reportAction(c *cli.Context) error {
 // It returns an error if any during the execution.
 func orchestrateWorkload(ctx context.Context, manifests [][]byte, manifestHashes []string, jwt_token string, conf *TestConfig) error {
 	zlog.Debug(ctx).Msg("Orchestrating reports workload")
-	zlog.Info(ctx).Str("UUID", conf.UUID).Msg("Run details")
+	zlog.Info(ctx).Str("RUNID", conf.RUNID).Msg("Run details")
 	var requests []map[string]interface{}
 	var err error
 	attackMap := map[string]string{
-		"UUID":        conf.UUID,
+		"RUNID":       conf.RUNID,
 		"Concurrency": strconv.Itoa(conf.Concurrency),
 		"ESHost":      conf.ESHost,
 		"ESPort":      conf.ESPort,

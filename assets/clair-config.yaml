@@ -39,8 +39,8 @@ spec:
             value: <clair-host>
           - name: CLAIR_TEST_CONTAINERS
             value: <clair-test-containers>
-          - name: CLAIR_TEST_UUID
-            value: <clair-test-uuid>
+          - name: CLAIR_TEST_RUNID
+            value: <clair-test-runid>
           - name: CLAIR_TEST_PSK
             value: <clair-psk>
           - name: CLAIR_TEST_REPO_PREFIX
