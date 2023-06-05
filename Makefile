@@ -13,7 +13,7 @@ SOURCES := $(shell find . -type f -name "*.go")
 # Containers
 ENGINE ?= podman
 REGISTRY = quay.io
-ORG ?= vchalla
+ORG ?= clair-load-test
 CONTAINER_NAME_ARCH = $(REGISTRY)/$(ORG)/clair-load-test:$(ARCH)
 
 all: lint build images push
