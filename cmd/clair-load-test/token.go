@@ -10,6 +10,13 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
+// Constants defined here.
+const (
+	TokenIssuer         = "clairctl"
+	TokenValidityPeriod = time.Hour * 24 * 7
+)
+
+// CreateTokenCmd handles createtoken CLI.
 var CreateTokenCmd = &cli.Command{
 	Name:        "createtoken",
 	Description: "Creates a JWT token given a psk",
@@ -25,11 +32,13 @@ var CreateTokenCmd = &cli.Command{
 	},
 }
 
+// createTokenAction to drive token action from the CLI options.
+// It returns an error if any during the execution.
 func createTokenAction(c *cli.Context) error {
 	ctx := c.Context
 	key := c.String("key")
 	zlog.Debug(ctx).Str("key", key).Msg("got md5 key")
-	tok, err := createToken(key)
+	tok, err := CreateToken(key)
 	if err != nil {
 		return err
 	}
@@ -37,7 +46,9 @@ func createTokenAction(c *cli.Context) error {
 	return nil
 }
 
-func createToken(key string) (string, error) {
+// CreateToken creates a token from the input PSK key.
+// It returns a token string and an error if any during the execution.
+func CreateToken(key string) (tok string, err error) {
 	decKey, err := base64.StdEncoding.DecodeString(key)
 	if err != nil {
 		return "", err
@@ -54,10 +65,9 @@ func createToken(key string) (string, error) {
 
 	// Mint the jwt.
 	return jwt.Signed(s).Claims(&jwt.Claims{
-		Issuer:    "clairctl",
-		Expiry:    jwt.NewNumericDate(now.Add(time.Minute * 10)),
+		Issuer:    TokenIssuer,
+		Expiry:    jwt.NewNumericDate(now.Add(TokenValidityPeriod)),
 		IssuedAt:  jwt.NewNumericDate(now),
 		NotBefore: jwt.NewNumericDate(now),
 	}).CompactSerialize()
-
 }

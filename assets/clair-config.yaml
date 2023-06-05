@@ -1,0 +1,66 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: clair-perf-test-serviceaccount
+rules:
+- apiGroups: ["extensions", "apps", "batch", "security.openshift.io", "policy"]
+  resources: ["deployments", "jobs", "pods", "services", "jobs/status", "podsecuritypolicies", "securitycontextconstraints"]
+  verbs: ["use", "get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: clair-perf-test-role
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: clair-perf-test-serviceaccount
+subjects:
+- kind: ServiceAccount
+  name: default
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: clair-perf-test-orchestrator
+  labels:
+    clair-perf-test-component: orchestrator
+spec:
+  template:
+    spec:
+      containers:
+      - name: clair-testing
+        image: quay.io/clair-load-test/clair-load-test:amd64 
+        securityContext:
+          privileged: true
+        env:
+          - name: CLAIR_TEST_HOST
+            value: <clair-host>
+          - name: CLAIR_TEST_CONTAINERS
+            value: <clair-test-containers>
+          - name: CLAIR_TEST_RUNID
+            value: <clair-test-runid>
+          - name: CLAIR_TEST_PSK
+            value: <clair-psk>
+          - name: CLAIR_TEST_REPO_PREFIX
+            value: <clair-test-repo-prefix>
+          - name: CLAIR_TEST_ES_HOST
+            value: <es-host>
+          - name: CLAIR_TEST_ES_PORT
+            value: <es-port>
+          - name: CLAIR_TEST_ES_INDEX
+            value: <es-index>
+          - name: CLAIR_TEST_INDEX_REPORT_DELETE
+            value: <delete-flag-for-index-report-deletion>
+          - name: CLAIR_TEST_HIT_SIZE
+            value: <hit-size>
+          - name: CLAIR_TEST_CONCURRENCY
+            value: <concurrency>
+        resources:
+          requests:
+            cpu: "1"
+            memory: "512Mi"
+        imagePullPolicy: Always
+      restartPolicy: Never
+  backoffLimit: 0
