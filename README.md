@@ -40,7 +40,7 @@ Deploy `assets/clair-config.yaml` on to your openshift cluster.
 * `CLAIR_TEST_ES_INDEX` - String indicating the ES index to upload the results.
 * `CLAIR_TEST_INDEX_REPORT_DELETE` - Boolean flag to indicate the index reports deletion at the end of the test run.
 * `CLAIR_TEST_HIT_SIZE` - Indicates the total amount of requests to hit the system with.
-* `CLAIR_TEST_LAYERS` - One among [5, 10, 15, 20, 25, 30, 35, 40] to pull image manifests with those many layers for testing. Valid only when pulling manifests from remote repository (i.e. using **CLAIR_TEST_REPO_PREFIX**) instead of using **CLAIR_TEST_CONTAINERS** option.
+* `CLAIR_TEST_LAYERS` - One among [-1, 5, 10, 15, 20, 25, 30, 35, 40] to pull image manifests with those many layers for testing. (-1) simulates a mixed workload that runs on manifests each with random number of layers. Valid only when pulling manifests from remote repository (i.e. using **CLAIR_TEST_REPO_PREFIX**) instead of using **CLAIR_TEST_CONTAINERS** option.
 * `CLAIR_TEST_CONCURRENCY` - Indicates the rate(concurrency) at which the requests hits must happen in parallel.
 
 Once triggered it will create a job in the specified namespace and will start running the tests with above mentioned values.
