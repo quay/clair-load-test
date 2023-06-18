@@ -28,7 +28,8 @@ This will create 1 to 10000 tags of images specified in the load repo which will
 
 ### **Run Phase**
 ### **Usage on openshift platform**
-Deploy `assets/clair-config.yaml` on to your openshift cluster.
+#### **Sample Clair App** : Deploy `assets/clair-setup.yaml` on to your openshift cluster for a sample clair app or else have your own clair app up and running.  
+Next in order to trigger the tests, deploy `assets/clair-config.yaml` on to your openshift cluster.
 ### **Envs**
 * `CLAIR_TEST_HOST` - String indicating clair host to perform testing.
 * `CLAIR_TEST_CONTAINERS` - String with comma separated list of conatiner images.
@@ -116,3 +117,8 @@ Gets the list of manifests from the test repo(created during load phase) which i
 clair-load-test -D report --hitsize=25 --layers=5 --concurrency=10 --delete=true --host=http://example-registry-clair-app-quay-enterprise.apps.vchalla-clair-test.perfscale.devcluster.openshift.com --psk=RUZMTEVxMFI2QmVTRnhhNG5VUTF0ZVJZb1hLeTYwY20= --testrepoprefix="quay.io/vchalla/clair-load-test:mysql_8.0.25" --eshost="https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com" --esport="443" --esindex="clair-test-index"
 ```
 > **NOTE**: Both `--containers` and `--testrepoprefix` options are mutually exclusive.
+
+## **Profiling**
+### **System Level Profiling**
+Inorder to perform system level profiling we use [parca](https://www.parca.dev/docs/overview). To install parca onto your cluster, deploy `assets/parca-server.yaml` and `assets/parca-agent.yaml` in sequence. Now wait until the pods are up and running in the `parca` namespace. For other installation method please refer [this](https://www.parca.dev/docs/quickstart).   
+Once parca is ready, we should be able to logon to the parca route in the `parca` namespace and view the system level profiling data.
