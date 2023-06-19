@@ -116,3 +116,8 @@ Gets the list of manifests from the test repo(created during load phase) which i
 clair-load-test -D report --hitsize=25 --layers=5 --concurrency=10 --delete=true --host=http://example-registry-clair-app-quay-enterprise.apps.vchalla-clair-test.perfscale.devcluster.openshift.com --psk=RUZMTEVxMFI2QmVTRnhhNG5VUTF0ZVJZb1hLeTYwY20= --testrepoprefix="quay.io/vchalla/clair-load-test:mysql_8.0.25" --eshost="https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com" --esport="443" --esindex="clair-test-index"
 ```
 > **NOTE**: Both `--containers` and `--testrepoprefix` options are mutually exclusive.
+
+## **Profiling**
+### **Application Level Profiling**
+Inorder to perform application level profiling we use [pyroscope](https://pyroscope.io/docs/). To install pyroscope onto your cluster, deploy `assets/pyroscope-server.yaml`. Now wait until the pods are up and running in the `pyroscope` namespace. For other installation methods please refer [this](https://pyroscope.io/docs/server-install-macos/).   
+Once pyroscope is ready, we should be able to logon to the pyroscope route in the `pyroscope` namespace and view the application level profiling data using the tags applied as filters. Please refer to this [tutorial](https://github.com/grafana/pyroscope/tree/main/examples/golang-push) and live [demo](https://demo.pyroscope.io/explore?query=rideshare-app-golang.cpu%7B%7D&groupBy=region&groupByValue=All) for more details on integration.
