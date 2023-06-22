@@ -2,7 +2,8 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: quay-enterprise-serviceaccount
+  name: clair-serviceaccount
+  namespace: clair-namespace
 rules:
 - apiGroups:
   - ""
@@ -34,11 +35,12 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: quay-enterprise-secret-writer
+  name: clair-secret-writer
+  namespace: clair-namespace
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: quay-enterprise-serviceaccount
+  name: clair-serviceaccount
 subjects:
 - kind: ServiceAccount
   name: default
@@ -47,6 +49,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: postgres-clair-storage
+  namespace: clair-namespace
 spec:
   accessModes:
   - ReadWriteOnce
@@ -60,6 +63,7 @@ metadata:
   labels:
     app: postgres-clair
   name: postgres-clair
+  namespace: clair-namespace
 spec:
   replicas: 1
   selector:
@@ -105,6 +109,7 @@ metadata:
   labels:
     app: postgres-clair
   name: postgres-clair
+  namespace: clair-namespace
 spec:
   ports:
   - name: postgres
@@ -119,6 +124,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: clair-configmap
+  namespace: clair-namespace
 data:
   config.yaml: |
     introspection_addr: ""
@@ -166,6 +172,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: clair-deployment
+  namespace: clair-namespace
 spec:
   selector:
     matchLabels:
@@ -227,6 +234,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: clair-service
+  namespace: clair-namespace
 spec:
   selector:
     app: clair
@@ -245,6 +253,7 @@ apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: clair-route
+  namespace: clair-namespace
 spec:
   to:
     kind: Service
@@ -257,6 +266,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: clair-service-monitor
+  namespace: clair-namespace
   labels:
     app: clair
 spec:
@@ -272,6 +282,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: clair-deployment
+  namespace: clair-namespace
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
