@@ -28,7 +28,8 @@ This will create 1 to 10000 tags of images specified in the load repo which will
 
 ### **Run Phase**
 ### **Usage on openshift platform**
-Deploy `assets/clair-config.yaml` on to your openshift cluster.
+#### **Sample Clair App** : Deploy `assets/clair-setup.yaml` on to your openshift cluster for a sample clair app or else have your own clair app up and running.  
+Next in order to trigger the tests, deploy `assets/clair-config.yaml` on to your openshift cluster.
 ### **Envs**
 * `CLAIR_TEST_HOST` - String indicating clair host to perform testing.
 * `CLAIR_TEST_CONTAINERS` - String with comma separated list of conatiner images.
@@ -121,3 +122,6 @@ clair-load-test -D report --hitsize=25 --layers=5 --concurrency=10 --delete=true
 ### **Application Level Profiling**
 Inorder to perform application level profiling we use [pyroscope](https://pyroscope.io/docs/). To install pyroscope onto your cluster, deploy `assets/pyroscope-server.yaml`. Now wait until the pods are up and running in the `pyroscope` namespace. For other installation methods please refer [this](https://pyroscope.io/docs/server-install-macos/).   
 Once pyroscope is ready, we should be able to logon to the pyroscope route in the `pyroscope` namespace and view the application level profiling data using the tags applied as filters. Please refer to this [tutorial](https://github.com/grafana/pyroscope/tree/main/examples/golang-push) and live [demo](https://demo.pyroscope.io/explore?query=rideshare-app-golang.cpu%7B%7D&groupBy=region&groupByValue=All) for more details on integration.
+### **System Level Profiling**
+Inorder to perform system level profiling we use [parca](https://www.parca.dev/docs/overview). To install parca onto your cluster, deploy `assets/parca-server.yaml` and `assets/parca-agent.yaml` in sequence. Now wait until the pods are up and running in the `parca` namespace. For other installation method please refer [this](https://www.parca.dev/docs/quickstart).   
+Once parca is ready, we should be able to logon to the parca route in the `parca` namespace and view the system level profiling data.

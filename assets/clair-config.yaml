@@ -3,6 +3,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: clair-perf-test-serviceaccount
+  namespace: clair-test
 rules:
 - apiGroups: ["extensions", "apps", "batch", "security.openshift.io", "policy"]
   resources: ["deployments", "jobs", "pods", "services", "jobs/status", "podsecuritypolicies", "securitycontextconstraints"]
@@ -12,6 +13,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: clair-perf-test-role
+  namespace: clair-test
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -24,6 +26,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: clair-perf-test-orchestrator
+  namespace: clair-test
   labels:
     clair-perf-test-component: orchestrator
 spec:
