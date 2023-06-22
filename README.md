@@ -125,3 +125,37 @@ Once pyroscope is ready, we should be able to logon to the pyroscope route in th
 ### **System Level Profiling**
 Inorder to perform system level profiling we use [parca](https://www.parca.dev/docs/overview). To install parca onto your cluster, deploy `assets/parca-server.yaml` and `assets/parca-agent.yaml` in sequence. Now wait until the pods are up and running in the `parca` namespace. For other installation method please refer [this](https://www.parca.dev/docs/quickstart).   
 Once parca is ready, we should be able to logon to the parca route in the `parca` namespace and view the system level profiling data.
+### **PostgresDB Profiling**
+In order to perform low overhead database profiling we will be using [pgBadger](https://github.com/darold/pgbadger). Below are the steps to do profiling on postgresDB.
+
+* **Step 1**: Login to the postgres DB and modify the postgres.conf in `/var/lib/postgresql/data/` with below flags (or can be modified according to our own use case).
+```
+log_checkpoints = on
+log_connections = on
+log_disconnections = on
+log_lock_waits = on
+log_temp_files = 0
+log_autovacuum_min_duration = 0
+log_error_verbosity = default
+log_destination = 'csvlog'
+logging_collector = on
+log_rotation_age = 1d
+log_rotation_size = 0
+log_truncate_on_rotation = on
+log_min_duration_statement = 0
+log_min_messages = debug1
+```
+
+* **Step 2**: Once after modifying the config restart the db using the below command
+```
+pg_ctl restart -D /var/lib/postgresql/data
+```
+
+* **Step 3**: Now we should be able to find the logs in `/var/lib/postgresql/data/log/`. Copy those logs to the location where `pgBadger` binary is installed.
+
+* **Step 4**: Then execute the below command to process those logs and get an html report. For more details on usage of `pgBadger`, refer [here](https://github.com/darold/pgbadger#table-of-contents).
+```
+pgbadger -j 8 ~/output/postgresql-2023-06-18_141703.csv -o /home/vchalla/output/output.html --format html
+```
+
+> **NOTE**: It is suggested to disable logs collector once we do the profiling to avoid overhead created by logs files getting accumulating in the DB.
