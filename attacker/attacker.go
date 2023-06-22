@@ -107,20 +107,16 @@ func RunVegeta(ctx context.Context, requestDicts []map[string]interface{}, testN
 	attacker := vegeta.NewAttacker(vegeta.Timeout(120 * time.Second))
 	totalRequests := len(requests)
 	completedRequests := 0
-	stop := make(chan struct{}) // Channel to stop the attack
 
 	var metrics vegeta.Metrics
-	go func() {
-		for res := range attacker.Attack(targeter, rate, duration, "Vegeta Attack") {
-			metrics.Add(res)
-			completedRequests++
-			if completedRequests == totalRequests {
-				stop <- struct{}{} // Send the stop signal if all requests are completed
-			}
+	for res := range attacker.Attack(targeter, rate, duration, "Vegeta Attack") {
+		completedRequests++
+		if completedRequests == totalRequests {
+			attacker.Stop()
 		}
-	}()
-	// Wait for the stop signal
-	<-stop
+		metrics.Add(res)
+	}
+
 	metrics.Close()
 
 	// Generate Vegeta text report
