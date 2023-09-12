@@ -79,7 +79,6 @@ WORKDIR /app$5$i
 RUN echo "#!/bin/sh" > myscript$5$i.sh && echo "echo \"Hello, world!\"" >> myscript$5$i.sh
 FROM $4
 WORKDIR /app$5$i
-RUN apt-get update && apt-get install -y --no-install-recommends tar && rm -rf /var/lib/apt/lists/*
 COPY --from=tarbuilder$5$i my_file$5$i.tar /app$5$i/
 COPY --from=tarbuilder$5$i my_file$5$i.tar /build$5$i/app$5$5$i$i/
 RUN tar -xf /app$5$i/my_file$5$i.tar --overwrite
