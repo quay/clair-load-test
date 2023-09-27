@@ -58,6 +58,8 @@ spec:
             value: <delete-flag-for-index-report-deletion>
           - name: CLAIR_TEST_HIT_SIZE
             value: <hit-size>
+          - name: CLAIR_TEST_LAYERS
+            value: <layers>
           - name: CLAIR_TEST_CONCURRENCY
             value: <concurrency>
         resources:
