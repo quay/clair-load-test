@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/quay/clair-load-test/attacker"
@@ -14,6 +13,9 @@ import (
 	"github.com/quay/zlog"
 	"github.com/urfave/cli/v2"
 )
+
+// Constants
+var validLayers = []int{-1, 5, 10, 15, 20, 25, 30, 35, 40}
 
 // Command line to handle reports functionality.
 var ReportsCmd = &cli.Command{
@@ -42,7 +44,7 @@ var ReportsCmd = &cli.Command{
 		},
 		&cli.StringFlag{
 			Name:    "testrepoprefix",
-			Usage:   "--testrepoprefix quay.io/vchalla/clair-load-test:mysql_8.0.25",
+			Usage:   "--testrepoprefix quay.io/vchalla/clair-load-test:mysql_8.0.25,quay.io/quay-qetest/clair-load-test:hadoop_latest",
 			Value:   "",
 			EnvVars: []string{"CLAIR_TEST_REPO_PREFIX"},
 		},
@@ -87,6 +89,14 @@ var ReportsCmd = &cli.Command{
 			Usage:   "--layers [-1, 5, 10, 15, 20, 25, 30, 35, 40]",
 			Value:   5,
 			EnvVars: []string{"CLAIR_TEST_LAYERS"},
+			Action: func(ctx *cli.Context, v int) error {
+				for _, layer := range validLayers {
+					if layer == v {
+						return nil
+					}
+				}
+				return fmt.Errorf("Invalid layer value. Must be one among: %v", validLayers)
+			},
 		},
 		&cli.IntFlag{
 			Name:    "concurrency",
@@ -95,13 +105,19 @@ var ReportsCmd = &cli.Command{
 			EnvVars: []string{"CLAIR_TEST_CONCURRENCY"},
 		},
 	},
+	Before: func(c *cli.Context) error {
+		if (c.String("containers") == "" && c.String("testrepoprefix") == "") || ((c.String("containers") != "") && c.String("testrepoprefix") != "") {
+			return fmt.Errorf("Please specify either --containers or --testrepoprefix options. Both are mutually exclusive")
+		}
+		return nil
+	},
 }
 
 // Type to store the test config.
 type TestConfig struct {
 	Containers     []string `json:"containers"`
 	Concurrency    int      `json:"concurrency"`
-	TestRepoPrefix string   `json:"testrepoprefix"`
+	TestRepoPrefix []string `json:"testrepoprefix"`
 	ESHost         string   `json:"eshost"`
 	ESPort         string   `json:"esport"`
 	ESIndex        string   `json:"esindex"`
@@ -116,9 +132,10 @@ type TestConfig struct {
 // NewConfig creates and returns a test configuration from CLI options.
 func NewConfig(c *cli.Context) *TestConfig {
 	containersArg := c.String("containers")
+	testRepoPrefixArg := c.String("testrepoprefix")
 	return &TestConfig{
-		Containers:     strings.Split(containersArg, ","),
-		TestRepoPrefix: c.String("testrepoprefix"),
+		Containers:     strings.Split(strings.TrimSpace(containersArg), ","),
+		TestRepoPrefix: strings.Split(strings.TrimSpace(testRepoPrefixArg), ","),
 		PSK:            c.String("psk"),
 		RUNID:          c.String("runid"),
 		Host:           c.String("host"),
@@ -132,20 +149,44 @@ func NewConfig(c *cli.Context) *TestConfig {
 	}
 }
 
+// calculateLayers calculates the layers number used while fetching images.
+// It returns an integer indicating amount of layers.
+func calculateLayers(ctx context.Context, layers int, validLayers []int) int {
+	if layers == (-1) {
+		index := rand.Intn(len(validLayers) - 1)
+		return validLayers[1+index]
+	} else {
+		return layers
+	}
+}
+
+// containerName generates the container name string.
+// It returns a string.
+func containerName(prefix string, nLayers, nTag int) string {
+	return prefix + "_layers_" + strconv.Itoa(nLayers) + "_tag_" + strconv.Itoa(nTag)
+}
+
 // getContainersList returns list of containers from test repo used in load phase.
 // It returns a list of strings which is a list of container names.
-func getContainersList(ctx context.Context, testRepoPrefix string, hitSize int, layers int, validLayers []int) []string {
+func getContainersList(ctx context.Context, testRepoPrefix []string, hitSize, layers int, validLayers []int) []string {
 	var containers []string
-	var newLayers int
-	rand.Seed(time.Now().UnixNano())
-	for i := 1; i <= hitSize; i++ {
-		if layers == (-1) {
-			index := rand.Intn(len(validLayers) - 1)
-			newLayers = validLayers[1+index]
-		} else {
-			newLayers = layers
+	testRepos := len(testRepoPrefix)
+	imagesPerRepo := (hitSize / testRepos)
+	leftOverImages := (hitSize % testRepos)
+	nLayers := calculateLayers(ctx, layers, validLayers)
+
+	if imagesPerRepo > 0 {
+		for _, repoPrefix := range testRepoPrefix {
+			for i := 1; i <= imagesPerRepo; i++ {
+				containers = append(containers, containerName(repoPrefix, nLayers, i))
+			}
 		}
-		containers = append(containers, testRepoPrefix+"_layers_"+strconv.Itoa(newLayers)+"_tag_"+strconv.Itoa(i))
+	}
+
+	idx := 0
+	for idx < leftOverImages {
+		containers = append(containers, containerName(testRepoPrefix[idx], nLayers, imagesPerRepo+1))
+		idx++
 	}
 	return containers
 }
@@ -155,21 +196,7 @@ func getContainersList(ctx context.Context, testRepoPrefix string, hitSize int, 
 func reportAction(c *cli.Context) error {
 	ctx := c.Context
 	conf := NewConfig(c)
-	if (c.String("containers") == "" && conf.TestRepoPrefix == "") || ((c.String("containers") != "") && conf.TestRepoPrefix != "") {
-		return fmt.Errorf("Please specify either of --containers or --testrepoprefix options. Both are mutually exclusive")
-	}
-	validLayers := []int{-1, 5, 10, 15, 20, 25, 30, 35, 40}
-	var validLayer bool
-	for _, layer := range validLayers {
-		if layer == conf.Layers {
-			validLayer = true
-			break
-		}
-	}
-	if !validLayer {
-		return fmt.Errorf("Invalid layer value. Must be one among: %v", validLayers)
-	}
-	if conf.TestRepoPrefix != "" {
+	if c.String("testrepoprefix") != "" {
 		conf.Containers = getContainersList(ctx, conf.TestRepoPrefix, conf.HitSize, conf.Layers, validLayers)
 	}
 	if len(conf.Containers) > conf.HitSize {

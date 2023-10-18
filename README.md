@@ -35,7 +35,7 @@ Next in order to trigger the tests, deploy `assets/clair-config.yaml` on to your
 * `CLAIR_TEST_CONTAINERS` - String with comma separated list of conatiner images.
 * `CLAIR_TEST_RUNID`(Optional) - String specifying the desired RUNID of the test run.
 * `CLAIR_TEST_PSK` - Psk string which can be found at `~/clair/config.yaml` in the clair app pod.
-* `CLAIR_TEST_REPO_PREFIX` - String indicating the test repo prefix.
+* `CLAIR_TEST_REPO_PREFIX` - String indicating comma separated test repo prefixes. Based on the hitsize specified and the number of images that are actually present with the given prefixes, our tool tries to fetch maximum number of manifests to load test.
 * `CLAIR_TEST_ES_HOST` - String indicating the ES instance host.
 * `CLAIR_TEST_ES_PORT` - Indicates the port number of ES instance.
 * `CLAIR_TEST_ES_INDEX` - String indicating the ES index to upload the results.
@@ -94,7 +94,7 @@ OPTIONS:
    --host value            --host localhost:6060/ (default: "http://localhost:6060/") [$CLAIR_TEST_HOST]
    --runid value           --runid f519d9b2-aa62-44ab-9ce8-4156b712f6d2 (default: "14484a83-abba-483c-9b66-3b5ce93b4088") [$CLAIR_TEST_RUNID]
    --containers value      --containers ubuntu:latest,mysql:latest [$CLAIR_TEST_CONTAINERS]
-   --testrepoprefix value  --testrepoprefix quay.io/vchalla/clair-load-test:mysql_8.0.25 [$CLAIR_TEST_REPO_PREFIX]
+   --testrepoprefix value  --testrepoprefix quay.io/vchalla/clair-load-test:mysql_8.0.25,quay.io/quay-qetest/clair-load-test:hadoop_latest [$CLAIR_TEST_REPO_PREFIX]
    --psk value             --psk secretkey [$CLAIR_TEST_PSK]
    --eshost value          --eshost eshosturl [$CLAIR_TEST_ES_HOST]
    --esport value          --esport esport [$CLAIR_TEST_ES_PORT]
@@ -109,12 +109,12 @@ OPTIONS:
 ### **Example Usage**
 Processes the below list of containers and executes tests at rate of 10rps with 25 HTTP requests in total.
 ```
-clair-load-test -D report --containers="quay.io/clair-load-test/ubuntu:xenial,quay.io/clair-load-test/ubuntu:focal,quay.io/clair-load-test/ubuntu:impish,quay.io/clair-load-test/ubuntu:trusty" --hitsize=25 --concurrency=10 --delete=true --host=http://example-registry-clair-app-quay-enterprise.apps.vchalla-clair-test.perfscale.devcluster.openshift.com --psk=RUZMTEVxMFI2QmVTRnhhNG5VUTF0ZVJZb1hLeTYwY20= --eshost="https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com" --esport="443" --esindex="clair-test-index"
+clair-load-test -D report --containers="quay.io/clair-load-test/ubuntu:xenial,quay.io/clair-load-test/ubuntu:focal,quay.io/clair-load-test/ubuntu:impish,quay.io/clair-load-test/ubuntu:trusty" --hitsize=25 --concurrency=10 --delete=true --host=http://example-registry-clair-app-quay-enterprise.apps.vchalla-clair-test.perfscale.devcluster.openshift.com --psk=RUZMTEVxMFI2QmVTRnhhNG5VUTF0ZVJZb1hLeTYwY20= --eshost="ES_URL" --esport="443" --esindex="clair-test-index"
 ```
 
 Gets the list of manifests from the test repo(created during load phase) which is specified through the `--testrepoprefix` option and runs the test at a rate of 10rps with 25 requests in total.
 ```
-clair-load-test -D report --hitsize=25 --layers=5 --concurrency=10 --delete=true --host=http://example-registry-clair-app-quay-enterprise.apps.vchalla-clair-test.perfscale.devcluster.openshift.com --psk=RUZMTEVxMFI2QmVTRnhhNG5VUTF0ZVJZb1hLeTYwY20= --testrepoprefix="quay.io/vchalla/clair-load-test:mysql_8.0.25" --eshost="https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com" --esport="443" --esindex="clair-test-index"
+clair-load-test -D report --hitsize=25 --layers=5 --concurrency=10 --delete=true --host=http://example-registry-clair-app-quay-enterprise.apps.vchalla-clair-test.perfscale.devcluster.openshift.com --psk=RUZMTEVxMFI2QmVTRnhhNG5VUTF0ZVJZb1hLeTYwY20= --testrepoprefix="quay.io/clair-load-test/clair-load-test:ubuntu_latest,quay.io/quay-qetest/clair-load-test:hadoop_latest" --eshost="ES_URL" --esport="443" --esindex="clair-test-index"
 ```
 > **NOTE**: Both `--containers` and `--testrepoprefix` options are mutually exclusive.
 
