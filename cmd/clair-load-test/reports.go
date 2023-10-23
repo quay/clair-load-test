@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/quay/clair-load-test/attacker"
@@ -194,6 +195,7 @@ func getContainersList(ctx context.Context, testRepoPrefix []string, hitSize, la
 // reportAction drives the report action logic.
 // It returns an error if any during the execution.
 func reportAction(c *cli.Context) error {
+	startTime := time.Now()
 	ctx := c.Context
 	conf := NewConfig(c)
 	if c.String("testrepoprefix") != "" {
@@ -202,23 +204,28 @@ func reportAction(c *cli.Context) error {
 	if len(conf.Containers) > conf.HitSize {
 		conf.Containers = conf.Containers[:conf.HitSize]
 	}
-	listOfManifests, listOfManifestHashes := manifests.GetManifest(ctx, conf.Containers, conf.Concurrency)
 	jwt_token, err := CreateToken(conf.PSK)
 	if err != nil {
 		zlog.Debug(ctx).Str("PSK", conf.PSK).Msg("creating token")
 		return fmt.Errorf("could not create token: %w", err)
 	}
+
+	zlog.Debug(ctx).Msg("Fetching manifests for an actual workload")
+	listOfManifests, listOfManifestHashes := manifests.GetManifest(ctx, conf.Containers, conf.Concurrency)
+	zlog.Info(ctx).Msg("🔥 Orchestrating the workload")
 	err = orchestrateWorkload(ctx, listOfManifests, listOfManifestHashes, jwt_token, conf)
 	if err != nil {
 		return err
 	}
+	endTime := time.Now()
+	elapsedTime := endTime.Sub(startTime)
+	zlog.Info(ctx).Stringer("duration", elapsedTime).Msg("Total time taken for completion")
 	return nil
 }
 
 // orchestrateWorkload triggers the api endpoint hits and writes results to the desired location.
 // It returns an error if any during the execution.
 func orchestrateWorkload(ctx context.Context, manifests [][]byte, manifestHashes []string, jwt_token string, conf *TestConfig) error {
-	zlog.Debug(ctx).Msg("Orchestrating reports workload")
 	zlog.Info(ctx).Str("RUNID", conf.RUNID).Msg("Run details")
 	var requests []map[string]interface{}
 	var err error
@@ -235,21 +242,25 @@ func orchestrateWorkload(ctx context.Context, manifests [][]byte, manifestHashes
 	if err != nil {
 		return fmt.Errorf("Error while running POST operation on index_report: %w", err)
 	}
+
 	requests = attacker.GetIndexReportRequests(ctx, manifestHashes, conf.Host, jwt_token)
 	err = attacker.RunVegeta(ctx, requests, "get_index_report", attackMap)
 	if err != nil {
 		return fmt.Errorf("Error while running GET operation on index_report: %w", err)
 	}
+
 	requests = attacker.GetVulnerabilityReportRequests(ctx, manifestHashes, conf.Host, jwt_token)
 	err = attacker.RunVegeta(ctx, requests, "get_vulnerability_report", attackMap)
 	if err != nil {
 		return fmt.Errorf("Error while running GET operation on vulnerability_report: %w", err)
 	}
+
 	requests = attacker.GetIndexerStateRequests(ctx, len(manifests), conf.Host, jwt_token)
 	err = attacker.RunVegeta(ctx, requests, "get_indexer_state", attackMap)
 	if err != nil {
 		return fmt.Errorf("Error while running GET operation on indexer_state: %w", err)
 	}
+
 	if conf.IndexDelete {
 		requests = attacker.DeleteIndexReportsRequests(ctx, manifestHashes, conf.Host, jwt_token)
 		err = attacker.RunVegeta(ctx, requests, "delete_index_report", attackMap)
@@ -257,5 +268,7 @@ func orchestrateWorkload(ctx context.Context, manifests [][]byte, manifestHashes
 			return fmt.Errorf("Error while running DELETE operation on index_report: %w", err)
 		}
 	}
+
+	zlog.Info(ctx).Str("RUNID", conf.RUNID).Msg("👋 Exiting clair-load-test")
 	return nil
 }

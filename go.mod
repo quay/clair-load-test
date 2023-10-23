@@ -1,6 +1,6 @@
 module github.com/quay/clair-load-test
 
-go 1.21
+go 1.20
 
 require (
 	github.com/cloud-bulldozer/go-commons v1.0.4

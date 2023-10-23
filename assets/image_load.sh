@@ -50,6 +50,11 @@ quay.io/clair-load-test/solar:8.9.0,\
 quay.io/clair-load-test/joomla:php7.4,\
 quay.io/clair-load-test/hadoop:latest,\
 quay.io/clair-load-test/quay-rhel8:v3.6.4-2,\
+quay.io/clair-load-test/suse:latest,\
+quay.io/clair-load-test/oracle:latest,\
+quay.io/clair-load-test/awslinux:latest,\
+quay.io/clair-load-test/vmwarephoton:latest,\
+quay.io/clair-load-test/python:latest,\
 quay.io/clair-load-test/debian:buster"}
 # Set the Dockerfile contents
 unique_id=$(cat /proc/sys/kernel/random/uuid)
