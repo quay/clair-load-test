@@ -78,15 +78,24 @@ spec:
     spec:
       containers:
       - env:
-        - name: POSTGRES_USER
+        - name: POSTGRESQL_USER
           value: clair
-        - name: POSTGRES_DB
+        - name: POSTGRESQL_DATABASE
           value: clair
-        - name: POSTGRES_PASSWORD
+        - name: POSTGRESQL_PASSWORD
           value: test123
-        image: postgres
+        - name: POSTGRESQL_ADMIN_PASSWORD
+          value: test123
+        - name: POSTGRESQL_SHARED_BUFFERS
+          value: 256MB
+        - name: POSTGRESQL_MAX_CONNECTIONS
+          value: "2000"
+        image: registry.redhat.io/rhel8/postgresql-13@sha256:eceab3d3b02f7d24054c410054b2f125eb4ec4ac9cca9d3f21702416d55a6c5c
         imagePullPolicy: IfNotPresent
         name: postgres-clair
+        runAsUser: 0
+        securityContext:
+          privileged: true
         resources:
           requests:
             cpu: 500m
@@ -95,7 +104,7 @@ spec:
         - containerPort: 5432
           protocol: TCP
         volumeMounts:
-        - mountPath: /var/lib/postgresql
+        - mountPath: /var/lib/pgsql/data
           name: postgredb
       volumes:
       - name: postgredb
@@ -116,9 +125,10 @@ spec:
     port: 5432
     protocol: TCP
     targetPort: 5432
+    nodePort: 30432
   selector:
     app: postgres-clair
-  type: ClusterIP
+  type: NodePort
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -129,7 +139,11 @@ data:
   config.yaml: |
     introspection_addr: ""
     http_listen_addr: :8080
-    log_level: debug
+    log_level: debug-color
+    updaters:
+      config:
+          rhel:
+              ignore_unpatched: true
     indexer:
       connstring: host=postgres-clair port=5432 dbname=clair user=clair password=test123 sslmode=disable
       scanlock_retry: 10
@@ -198,20 +212,18 @@ spec:
           - containerPort: 8089
             name: clair-intro
             protocol: TCP
-          readinessProbe:
-            failureThreshold: 3
-            periodSeconds: 10
-            successThreshold: 1
-            tcpSocket:
-              port: 8080
-            timeoutSeconds: 1
           startupProbe:
             tcpSocket:
               port: clair-intro
-            initialDelaySeconds: 0
             periodSeconds: 10
-            timeoutSeconds: 1
             failureThreshold: 300
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+          livelinessProbe:
+            httpGet:
+              port: clair-intro
+              path: /healthz
           resources:
             limits:
               cpu: "4"
