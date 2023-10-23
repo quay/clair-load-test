@@ -59,15 +59,15 @@ func indexVegetaResults(ctx context.Context, metrics vegeta.Metrics, testName st
 		Index:              attackMap["ESIndex"],
 		InsecureSkipVerify: true,
 	}
-	zlog.Debug(ctx).Msg("Creating opensearch indexer")
+	zlog.Info(ctx).Msg("Creating opensearch indexer")
 	indexer, err := indexers.NewIndexer(indexerConfig)
 	if err != nil {
 		return fmt.Errorf("Failure while connnecting to Elasticsearch: %w", err)
 	}
-	zlog.Debug(ctx).Str("server", indexerConfig.Servers[0]).Msg("Connected")
+	zlog.Info(ctx).Str("server", indexerConfig.Servers[0]).Msg("Connected")
 	concurrency, _ := strconv.Atoi(attackMap["Concurrency"])
 	hostname, _ := os.Hostname()
-	zlog.Debug(ctx).Str("es-index", attackMap["ESIndex"]).Msg("Indexing documents")
+	zlog.Info(ctx).Str("es-index", attackMap["ESIndex"]).Msg("Indexing documents")
 	resp, err := (*indexer).Index([]interface{}{Document{
 		Workload:       "clair-load-test",
 		Endpoint:       attackMap["Host"],
@@ -89,16 +89,16 @@ func indexVegetaResults(ctx context.Context, metrics vegeta.Metrics, testName st
 		RunID:          attackMap["RUNID"],
 	}}, indexers.IndexingOpts{})
 	if err != nil {
-		return fmt.Errorf(err.Error())
-	} else {
-		zlog.Debug(ctx).Msg(resp + "\n")
+		return err
 	}
+	zlog.Info(ctx).Msg(resp)
 	return nil
 }
 
 // RunVegeta runs vegeta, records their results and indexes to elastic search if provided with connection details.
 // It returns an error if any during the execution.
 func RunVegeta(ctx context.Context, requestDicts []map[string]interface{}, testName string, attackMap map[string]string) error {
+	startTime := time.Now()
 	requests := generateVegetaRequests(requestDicts)
 	concurrency, _ := strconv.Atoi(attackMap["Concurrency"])
 	rate := vegeta.Rate{Freq: concurrency, Per: time.Second}
@@ -123,17 +123,18 @@ func RunVegeta(ctx context.Context, requestDicts []map[string]interface{}, testN
 	report := vegeta.NewTextReporter(&metrics)
 	err := report.Report(os.Stdout)
 	if err != nil {
-		zlog.Debug(ctx).Msg("vegeta report command failure")
-		return err
+		return fmt.Errorf("vegeta report command failure: %w", err)
 	}
-	zlog.Debug(ctx).Msg("Vegeta attack completed successfully")
+	zlog.Info(ctx).Msg("Vegeta attack completed successfully")
+	endTime := time.Now()
+	elapsedTime := endTime.Sub(startTime)
+	zlog.Info(ctx).Stringer("duration", elapsedTime).Msg(fmt.Sprintf("Total time taken for %s", testName))
 
 	// Indexing results to elastic search
 	if attackMap["ESHost"] != "" && attackMap["ESPort"] != "" && attackMap["ESIndex"] != "" {
 		err = indexVegetaResults(ctx, metrics, testName, attackMap)
 		if err != nil {
-			zlog.Debug(ctx).Msg("Failed to indexing results to elastic search")
-			return err
+			return fmt.Errorf("Failed to indexing results to elastic search: %w", err)
 		}
 	}
 	return nil

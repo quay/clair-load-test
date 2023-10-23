@@ -12,7 +12,7 @@ import (
 // It returns a url and headers for the specified input.
 func getRequestCommons(ctx context.Context, endpoint, host, token string) (string, http.Header) {
 	url := host + endpoint
-	zlog.Debug(ctx).Str("endpoint", url).Msg("preparing headers")
+	zlog.Info(ctx).Str("endpoint", url).Msg("preparing headers")
 	headers := http.Header{
 		"Content-Type":  []string{"application/json"},
 		"Authorization": []string{fmt.Sprintf("Bearer %s", token)},
@@ -22,7 +22,7 @@ func getRequestCommons(ctx context.Context, endpoint, host, token string) (strin
 
 // CreateIndexReportRequests returns the list of requests to perform POST operation on index_report.
 func CreateIndexReportRequests(ctx context.Context, manifests [][]byte, host, token string) []map[string]interface{} {
-	zlog.Debug(ctx).Int("number of requests", len(manifests)).Msg("preparing requests for POST operation in index_report")
+	zlog.Info(ctx).Int("number of requests", len(manifests)).Msg("preparing requests for POST operation in index_report")
 	url, headers := getRequestCommons(ctx, "/indexer/api/v1/index_report", host, token)
 	var requests []map[string]interface{}
 	for _, manifest := range manifests {
@@ -38,7 +38,7 @@ func CreateIndexReportRequests(ctx context.Context, manifests [][]byte, host, to
 
 // GetIndexReportRequests returns the list of requests to perform GET operation on index_report.
 func GetIndexReportRequests(ctx context.Context, manifestHashes []string, host, token string) []map[string]interface{} {
-	zlog.Debug(ctx).Int("number of requests", len(manifestHashes)).Msg("preparing requests for GET operation in index_report")
+	zlog.Info(ctx).Int("number of requests", len(manifestHashes)).Msg("preparing requests for GET operation in index_report")
 	url, headers := getRequestCommons(ctx, "/indexer/api/v1/index_report/", host, token)
 	var requests []map[string]interface{}
 	for _, manifestHash := range manifestHashes {
@@ -53,7 +53,7 @@ func GetIndexReportRequests(ctx context.Context, manifestHashes []string, host, 
 
 // DeleteIndexReportsRequests returns the list of requests to perform DELETE operation on index_report.
 func DeleteIndexReportsRequests(ctx context.Context, manifestHashes []string, host, token string) []map[string]interface{} {
-	zlog.Debug(ctx).Int("number of requests", len(manifestHashes)).Msg("preparing requests for DELETE operation in index_report")
+	zlog.Info(ctx).Int("number of requests", len(manifestHashes)).Msg("preparing requests for DELETE operation in index_report")
 	url, headers := getRequestCommons(ctx, "/indexer/api/v1/index_report/", host, token)
 	var requests []map[string]interface{}
 	for _, manifestHash := range manifestHashes {
@@ -68,7 +68,7 @@ func DeleteIndexReportsRequests(ctx context.Context, manifestHashes []string, ho
 
 // GetVulnerabilityReportRequests returns the list of requests to perform GET operation on vulnerability_report.
 func GetVulnerabilityReportRequests(ctx context.Context, manifestHashes []string, host, token string) []map[string]interface{} {
-	zlog.Debug(ctx).Int("number of requests", len(manifestHashes)).Msg("preparing requests for GET operation in vulnerability_report")
+	zlog.Info(ctx).Int("number of requests", len(manifestHashes)).Msg("preparing requests for GET operation in vulnerability_report")
 	url, headers := getRequestCommons(ctx, "/matcher/api/v1/vulnerability_report/", host, token)
 	var requests []map[string]interface{}
 	for _, manifestHash := range manifestHashes {
@@ -83,7 +83,7 @@ func GetVulnerabilityReportRequests(ctx context.Context, manifestHashes []string
 
 // GetIndexerStateRequests returns the list of requests to perform GET operation on index_state.
 func GetIndexerStateRequests(ctx context.Context, hitsize int, host, token string) []map[string]interface{} {
-	zlog.Debug(ctx).Int("number of requests", hitsize).Msg("preparing requests for GET operation in index_state")
+	zlog.Info(ctx).Int("number of requests", hitsize).Msg("preparing requests for GET operation in index_state")
 	url, headers := getRequestCommons(ctx, "/indexer/api/v1/index_state", host, token)
 	var requests []map[string]interface{}
 	for i := 0; i < int(hitsize); i++ {
