@@ -157,7 +157,7 @@ data:
       index_report_request_concurrency: -1
     matcher:
       connstring: host=postgres-clair port=5432 dbname=clair user=clair password=test123 sslmode=disable
-      max_conn_pool: 100
+      max_conn_pool: 2000
       indexer_addr: "http://clair-indexer"
       migrations: true
       period: 6h
