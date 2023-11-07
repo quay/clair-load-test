@@ -102,18 +102,13 @@ func RunVegeta(ctx context.Context, requestDicts []map[string]interface{}, testN
 	requests := generateVegetaRequests(requestDicts)
 	concurrency, _ := strconv.Atoi(attackMap["Concurrency"])
 	rate := vegeta.Rate{Freq: concurrency, Per: time.Second}
-	duration := 0 * time.Second
+	duration := time.Second * time.Duration(len(requests)/concurrency)
 	targeter := vegeta.NewStaticTargeter(requests...)
-	attacker := vegeta.NewAttacker(vegeta.Timeout(120 * time.Second))
-	totalRequests := len(requests)
-	completedRequests := 0
+	attacker := vegeta.NewAttacker(vegeta.Timeout(6000 * time.Second))
 
+	// Initiate vegeta attack and stop immediately after completion
 	var metrics vegeta.Metrics
 	for res := range attacker.Attack(targeter, rate, duration, "Vegeta Attack") {
-		completedRequests++
-		if completedRequests == totalRequests {
-			attacker.Stop()
-		}
 		metrics.Add(res)
 	}
 
